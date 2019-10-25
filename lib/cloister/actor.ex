@@ -39,14 +39,26 @@ defmodule Cloister.Actor do
         _ -> raise "roles: must be a list of one or more " <> inspect(@roles)
       end
 
-    delegates =
-      Enum.flat_map(roles, fn role ->
-        mod = Module.concat(__MODULE__, role |> to_string() |> Macro.camelize())
-        Cloister.Helper.delegate_all(mod)
-      end)
+    delegates = [
+      quote do
+        @impl GenServer
+        def handle_cast({action, thing}, state) when action in unquote(@roles) do
+          case action do
+            :prepare -> perform_prepare(thing)
+          end
+        end
+
+        def perform_prepare(%Cloister.Message.Prepare{} = message), do: message
+        defoverridable perform_prepare: 1
+      end
+      | Enum.map(roles, fn role ->
+          mod = Module.concat("Cloister.Actor", role |> to_string() |> Macro.camelize())
+          quote do: use(unquote(mod), name: Keyword.get(unquote(opts), :name, __MODULE__))
+        end)
+    ]
 
     [
-      quote do
+      quote location: :keep, generated: true do
         use GenServer
         alias Cloister.Actor.State
 
@@ -71,12 +83,14 @@ defmodule Cloister.Actor do
 
         @impl GenServer
         def handle_continue(:quorum, %{} = state) do
-          sentries = Application.fetch_env!(state.otp_app, :sentry)
+          active_sentry =
+            for sentry <- Application.fetch_env!(state.otp_app, :sentry),
+                Node.connect(sentry),
+                do: sentry
 
-          case Cloister.Quorum.quorum?(sentries) do
-            {true, _} -> {:noreply, %State{state | ready: true}}
-            _ -> {:noreply, state, {:continue, :quorum}}
-          end
+          if active_sentry,
+            do: {:noreply, %State{state | ready: true}},
+            else: {:noreply, state, {:continue, :quorum}}
         end
 
         @impl GenServer
@@ -91,9 +105,18 @@ defmodule Cloister.Actor do
   end
 
   defmodule Proposer do
-    def prepare() do
-    end
+    defmacro __using__(opts \\ []) do
+      quote bind_quoted: [name: opts[:name]] do
+        @behaviour Cloister.Behaviours.Proposer
 
-    # def on_handle_prepare()
+        @impl Cloister.Behaviours.Proposer
+        def prepare(%Cloister.Message.Prepare{} = message),
+          do: GenServer.cast(unquote(name), {:prepare, message})
+
+        def perform_prepare(%Cloister.Message.Prepare{} = message) do
+          {:noreply, IO.inspect(message, label: "Prepare")}
+        end
+      end
+    end
   end
 end

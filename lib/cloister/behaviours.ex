@@ -1,5 +1,5 @@
 defmodule Cloister.Behaviours do
-  defmodule Prepare do
-    @callback prepare(message: %Cloister.Message.Prepare{}, quorum: Cloister.Quorum.t()) :: :ok
+  defmodule Proposer do
+    @callback prepare(message: Cloister.Message.Prepare.t()) :: :ok
   end
 end
