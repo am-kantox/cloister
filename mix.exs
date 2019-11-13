@@ -8,6 +8,7 @@ defmodule Cloister.MixProject do
       elixir: "~> 1.9",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      aliases: aliases(),
       deps: deps(),
       xref: [exclude: []],
       dialyzer: [
