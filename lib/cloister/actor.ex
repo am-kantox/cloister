@@ -24,10 +24,10 @@ defmodule Cloister.Actor do
   """
 
   @roles [:client, :acceptor, :proposer, :learner, :leader]
+  @messages [:prepare]
 
   defmodule State do
-    # @enforce_keys [:messages]
-    defstruct messages: [], otp_app: :cloister, roles: [], ready: false, payload: %{}
+    defstruct otp_app: :cloister, roles: [], payload: %{}
   end
 
   defmacro __using__(opts) do
@@ -41,18 +41,25 @@ defmodule Cloister.Actor do
 
     delegates = [
       quote do
+        alias Cloister.Actor.State
+        alias Cloister.Message.{Prepare}
+
         @impl GenServer
-        def handle_cast({action, thing}, state) when action in unquote(@roles) do
-          case action do
-            :prepare -> perform_prepare(thing)
-          end
+        def handle_call({action, message}, _from, %State{} = state)
+            when action in unquote(@messages) do
+          feedback =
+            case action do
+              :prepare ->
+                {response, state} = perform_prepare(state)
+                {:reply, response, state}
+            end
         end
 
-        def perform_prepare(%Cloister.Message.Prepare{} = message), do: message
+        def perform_prepare(%State{} = state), do: {state, state}
         defoverridable perform_prepare: 1
       end
       | Enum.map(roles, fn role ->
-          mod = Module.concat("Cloister.Actor", role |> to_string() |> Macro.camelize())
+          mod = Module.concat("Cloister.Actors", role |> to_string() |> Macro.camelize())
           quote do: use(unquote(mod), name: Keyword.get(unquote(opts), :name, __MODULE__))
         end)
     ]
@@ -60,37 +67,44 @@ defmodule Cloister.Actor do
     [
       quote location: :keep, generated: true do
         use GenServer
-        alias Cloister.Actor.State
 
         @name Keyword.get(unquote(opts), :name, __MODULE__)
 
-        def start_link(payload) do
+        def start_link(%{} = payload) do
           GenServer.start_link(
             __MODULE__,
             %State{
               otp_app: Keyword.get(unquote(opts), :otp_app, :cloister),
               roles: unquote(roles),
-              payload: payload
+              payload: Map.merge(payload, %State{}.payload)
             },
             name: @name
           )
         end
 
         def state, do: GenServer.call(@name, :state)
+        def roles, do: GenServer.call(@name, :state).roles
 
         @impl GenServer
         def init(state), do: {:ok, state, {:continue, :quorum}}
 
         @impl GenServer
         def handle_continue(:quorum, %{} = state) do
-          active_sentry =
-            for sentry <- Application.fetch_env!(state.otp_app, :sentry),
-                Node.connect(sentry),
-                do: sentry
+          {:noreply, state}
+          # active_sentry =
+          #   for sentry <- Application.fetch_env!(state.otp_app, :sentry),
+          #       Node.connect(sentry),
+          #       do: sentry
 
-          if active_sentry,
-            do: {:noreply, %State{state | ready: true}},
-            else: {:noreply, state, {:continue, :quorum}}
+          # if active_sentry,
+          #   do: {:noreply, %State{state | ready: true}},
+          #   else: {:noreply, state, {:continue, :quorum}}
+        end
+
+        @impl GenServer
+        def handle_info({action, message}, state) do
+          IO.inspect({{action, message}, state}, label: "State")
+          {:noreply, state}
         end
 
         @impl GenServer
@@ -98,25 +112,5 @@ defmodule Cloister.Actor do
       end
       | delegates
     ]
-  end
-
-  defmodule Client do
-    def foo, do: 42
-  end
-
-  defmodule Proposer do
-    defmacro __using__(opts \\ []) do
-      quote bind_quoted: [name: opts[:name]] do
-        @behaviour Cloister.Behaviours.Proposer
-
-        @impl Cloister.Behaviours.Proposer
-        def prepare(%Cloister.Message.Prepare{} = message),
-          do: GenServer.cast(unquote(name), {:prepare, message})
-
-        def perform_prepare(%Cloister.Message.Prepare{} = message) do
-          {:noreply, IO.inspect(message, label: "Prepare")}
-        end
-      end
-    end
   end
 end

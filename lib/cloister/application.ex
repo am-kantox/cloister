@@ -7,8 +7,8 @@ defmodule Cloister.Application do
 
   def start(_type, _args) do
     children = [
-      # Starts a worker by calling: Cloister.Worker.start_link(arg)
-      # {Cloister.Worker, arg}
+      Cloister,
+      Cloister.Node
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

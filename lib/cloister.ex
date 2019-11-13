@@ -1,18 +1,17 @@
 defmodule Cloister do
   @moduledoc """
-  Documentation for Cloister.
+  `Cloister` is a consensus handler for clusters.
   """
 
-  @doc """
-  Hello world.
+  use DynamicSupervisor
 
-  ## Examples
-
-      iex> Cloister.hello()
-      :world
-
-  """
-  def hello do
-    :world
+  @spec start_link(opts :: keyword()) :: Supervisor.on_start()
+  def start_link(opts \\ []) do
+    {name, opts} = Keyword.pop(opts, :name, __MODULE__)
+    DynamicSupervisor.start_link(__MODULE__, opts, name: name)
   end
+
+  @impl DynamicSupervisor
+  def init(opts),
+    do: DynamicSupervisor.init(Keyword.merge([strategy: :one_for_one], opts))
 end
