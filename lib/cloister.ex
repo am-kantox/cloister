@@ -1,6 +1,6 @@
 defmodule Cloister do
   @moduledoc """
-  `Cloister` is a consensus handler for clusters.
+  `Cloister` is a consensus helper for clusters.
   """
 
   use DynamicSupervisor
@@ -14,4 +14,12 @@ defmodule Cloister do
   @impl DynamicSupervisor
   def init(opts),
     do: DynamicSupervisor.init(Keyword.merge([strategy: :one_for_one], opts))
+
+  @spec whois(term :: any()) :: node() | {:error, :no_such_ring}
+  @doc "Returns who would be chosen by a hash ring for the term"
+  def whois(term), do: HashRing.Managed.key_to_node(:cloister, term)
+
+  defdelegate state, to: Cloister.Node
+  defdelegate siblings, to: Cloister.Node
+  defdelegate multicast(name, request), to: Cloister.Node
 end

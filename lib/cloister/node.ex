@@ -7,7 +7,7 @@ defmodule Cloister.Node do
 
   use GenServer
 
-  defstruct otp_app: :cloister, ring: :cloister, clustered?: false, sentry?: false
+  defstruct otp_app: :cloister, clustered?: false, sentry?: false, alive?: false
 
   @typedoc "Internal representation of the Node managed by Cloister"
   @type t :: %__MODULE__{}
@@ -19,18 +19,33 @@ defmodule Cloister.Node do
   def init(state), do: {:ok, state, {:continue, :quorum}}
 
   @impl GenServer
-  def handle_continue(:quorum, %N{} = state) do
+  def handle_continue(:quorum, %N{} = state),
+    do: do_handle_quorum(Node.alive?(), state)
+
+  @spec do_handle_quorum(boolean(), state :: t()) ::
+          {:noreply, new_state} | {:noreply, new_state, {:continue, term()}}
+        when new_state: term()
+  defp do_handle_quorum(true, %N{otp_app: otp_app} = state) do
     active_sentry =
-      for sentry <- Application.fetch_env!(state.otp_app, :sentry),
+      for sentry <- Application.fetch_env!(otp_app, :sentry),
           Node.connect(sentry),
           do: sentry
 
     if active_sentry != [] do
-      {:noreply, %N{state | sentry?: Enum.member?(active_sentry, Node.self()), clustered?: true}}
+      {:noreply,
+       %N{
+         state
+         | alive?: true,
+           sentry?: Enum.member?(active_sentry, Node.self()),
+           clustered?: true
+       }}
     else
       {:noreply, state, {:continue, :quorum}}
     end
   end
+
+  defp do_handle_quorum(false, state),
+    do: {:noreply, %N{state | sentry?: true, clustered?: false}}
 
   ##############################################################################
 
@@ -42,9 +57,10 @@ defmodule Cloister.Node do
   @doc "Returns whether the requested amount of nodes in the cluster are connected"
   def siblings, do: GenServer.call(__MODULE__, :siblings)
 
-  @spec whois(term :: any()) :: node() | {:error, :no_such_ring}
-  @doc "Returns who would be chosen by a hash ring for the term"
-  def whois(term), do: GenServer.call(__MODULE__, {:whois, term})
+  @spec multicast(name :: GenServer.name(), request :: term()) :: :abcast
+  @doc "Casts the request to all the nodes connected to this node"
+  def multicast(name, request),
+    do: GenServer.cast(__MODULE__, {:multicast, name, request})
 
   ##############################################################################
 
@@ -55,7 +71,7 @@ defmodule Cloister.Node do
   def handle_call(:siblings, _from, state) do
     connected =
       :connected
-      |> :"Elixir.Node".list()
+      |> Elixir.Node.list()
       |> Enum.count()
       |> Kernel.+(1)
 
@@ -72,6 +88,8 @@ defmodule Cloister.Node do
   end
 
   @impl GenServer
-  def handle_call({:whois, term}, _from, state),
-    do: {:reply, HashRing.Managed.key_to_node(state.ring, term), state}
+  def handle_cast({:multicast, name, request}, state) do
+    GenServer.abcast(name, request)
+    {:noreply, state}
+  end
 end
