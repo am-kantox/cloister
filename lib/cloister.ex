@@ -19,6 +19,10 @@ defmodule Cloister do
   @doc "Returns who would be chosen by a hash ring for the term"
   def whois(term), do: HashRing.Managed.key_to_node(:cloister, term)
 
+  @spec mine?(term :: any()) :: boolean() | {:error, :no_such_ring}
+  @doc "Returns `true` if the hashring points to this node for the term given, `false` otherwise"
+  def mine?(term), do: whois(term) == node()
+
   defdelegate state, to: Cloister.Node
   defdelegate siblings, to: Cloister.Node
   defdelegate multicast(name, request), to: Cloister.Node
