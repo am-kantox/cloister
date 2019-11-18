@@ -6,12 +6,14 @@ defmodule Cloister do
   use DynamicSupervisor
 
   @spec start_link(opts :: keyword()) :: Supervisor.on_start()
+  @doc false
   def start_link(opts \\ []) do
     {name, opts} = Keyword.pop(opts, :name, __MODULE__)
     DynamicSupervisor.start_link(__MODULE__, opts, name: name)
   end
 
   @impl DynamicSupervisor
+  @doc false
   def init(opts),
     do: DynamicSupervisor.init(Keyword.merge([strategy: :one_for_one], opts))
 

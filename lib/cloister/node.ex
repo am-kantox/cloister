@@ -12,19 +12,23 @@ defmodule Cloister.Node do
   @typedoc "Internal representation of the Node managed by Cloister"
   @type t :: %__MODULE__{}
 
+  @doc false
   def start_link(opts \\ []),
     do: GenServer.start_link(__MODULE__, struct(Cloister.Node, opts), name: __MODULE__)
 
   @impl GenServer
+  @doc false
   def init(state), do: {:ok, state, {:continue, :quorum}}
 
   @impl GenServer
+  @doc false
   def handle_continue(:quorum, %N{} = state),
     do: do_handle_quorum(Node.alive?(), state)
 
   @spec do_handle_quorum(boolean(), state :: t()) ::
           {:noreply, new_state} | {:noreply, new_state, {:continue, term()}}
         when new_state: term()
+  @doc false
   defp do_handle_quorum(true, %N{otp_app: otp_app} = state) do
     active_sentry =
       for sentry <- Application.fetch_env!(otp_app, :sentry),
@@ -44,6 +48,7 @@ defmodule Cloister.Node do
     end
   end
 
+  @doc false
   defp do_handle_quorum(false, state),
     do: {:noreply, %N{state | sentry?: true, clustered?: false}}
 
@@ -65,9 +70,11 @@ defmodule Cloister.Node do
   ##############################################################################
 
   @impl GenServer
+  @doc false
   def handle_call(:state, _from, state), do: {:reply, state, state}
 
   @impl GenServer
+  @doc false
   def handle_call(:siblings, _from, state) do
     connected =
       :connected

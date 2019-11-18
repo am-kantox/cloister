@@ -13,6 +13,7 @@ defmodule Cloister.MixProject do
       start_permanent: Mix.env() == :prod,
       xref: [exclude: []],
       description: description(),
+      package: package(),
       deps: deps(),
       aliases: aliases(),
       xref: [exclude: []],
@@ -94,7 +95,7 @@ defmodule Cloister.MixProject do
       logo: "stuff/cloister-48x48.png",
       source_url: "https://github.com/am-kantox/#{@app}",
       assets: "stuff/images",
-      extras: [],
+      extras: ["README.md"],
       groups_for_modules: []
     ]
   end
