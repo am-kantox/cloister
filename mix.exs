@@ -64,13 +64,11 @@ defmodule Cloister.MixProject do
 
   defp description do
     """
-    The helper application to manage cluster.
+    The helper application to manage cluster, that uses hash ring to route requests to nodes.
 
-    This package uses hash ring to define what node should execute the request.
-    It automatically keeps track of connected nodes.
-    Also provides helper functions to determine whether the term is to be executed
-    on the local node, to multicast to all the nodes in the cluster and to
-    retrieve current state of the cluster and siblings of the node.
+    Automatically keeps track of connected nodes, provides helpers
+    to determine where the term is to be executed, to multicast to all the nodes
+    in the cluster and to retrieve current state of the cluster.
     """
   end
 
