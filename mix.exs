@@ -37,7 +37,7 @@ defmodule Cloister.MixProject do
       {:libring, "~> 1.0"},
       # dev / test
       {:credo, "~> 1.0", only: [:dev, :ci]},
-      {:test_cluster_task, "~> 0.4", only: [:dev, :test, :ci]},
+      {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci]},
       {:dialyxir, "~> 1.0.0-rc.6", only: [:dev, :test, :ci], runtime: false},
       {:ex_doc, "~> 0.11", only: :dev}
     ]
@@ -50,7 +50,8 @@ defmodule Cloister.MixProject do
         "format --check-formatted",
         "credo --strict",
         "dialyzer --halt-exit-status"
-      ]
+      ],
+      test: ["test.cluster"]
     ]
   end
 end

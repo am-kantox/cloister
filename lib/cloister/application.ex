@@ -6,10 +6,17 @@ defmodule Cloister.Application do
   use Application
 
   def start(_type, _args) do
-    children = [
-      Cloister,
-      Cloister.Node
-    ]
+    additional_modules =
+      Enum.filter(
+        Application.get_env(:cloister, :additional_modules, []),
+        &Code.ensure_compiled?/1
+      )
+
+    children =
+      [
+        Cloister,
+        Cloister.Node
+      ] ++ additional_modules
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

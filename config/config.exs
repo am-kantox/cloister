@@ -1,8 +1,9 @@
 import Config
 
 config :cloister,
-  sentry: ~w|foo_1@127.0.0.1 inexisting@127.0.0.1|a,
-  consensus: 2
+  sentry: ~w|cloister-foo-0@127.0.0.1 inexisting@127.0.0.1|a,
+  consensus: 4,
+  additional_modules: [Cloister.Void]
 
 config :libring,
   rings: [

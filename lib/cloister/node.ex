@@ -60,7 +60,7 @@ defmodule Cloister.Node do
   @spec multicast(name :: GenServer.name(), request :: term()) :: :abcast
   @doc "Casts the request to all the nodes connected to this node"
   def multicast(name, request),
-    do: GenServer.cast(__MODULE__, {:multicast, name, request})
+    do: GenServer.abcast(name, request)
 
   ##############################################################################
 
@@ -85,11 +85,5 @@ defmodule Cloister.Node do
       end
 
     {:reply, result, state}
-  end
-
-  @impl GenServer
-  def handle_cast({:multicast, name, request}, state) do
-    GenServer.abcast(name, request)
-    {:noreply, state}
   end
 end
