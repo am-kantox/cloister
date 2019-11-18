@@ -1,16 +1,22 @@
 defmodule Cloister.MixProject do
   use Mix.Project
 
+  @app :cloister
+  @version "0.1.0"
+
   def project do
     [
-      app: :cloister,
-      version: "0.1.0",
+      app: @app,
+      version: @version,
       elixir: "~> 1.9",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      aliases: aliases(),
-      deps: deps(),
       xref: [exclude: []],
+      description: description(),
+      deps: deps(),
+      aliases: aliases(),
+      xref: [exclude: []],
+      docs: docs(),
       dialyzer: [
         plt_file: {:no_warn, ".dialyzer/plts/dialyzer.plt"},
         ignore_warnings: ".dialyzer/ignore.exs"
@@ -52,6 +58,44 @@ defmodule Cloister.MixProject do
         "dialyzer --halt-exit-status"
       ],
       test: ["test.cluster"]
+    ]
+  end
+
+  defp description do
+    """
+    The helper application to manage cluster.
+
+    This package uses hash ring to define what node should execute the request.
+    It automatically keeps track of connected nodes.
+    Also provides helper functions to determine whether the term is to be executed
+    on the local node, to multicast to all the nodes in the cluster and to
+    retrieve current state of the cluster and siblings of the node.
+    """
+  end
+
+  defp package do
+    [
+      name: @app,
+      files: ~w|config stuff lib mix.exs README.md|,
+      maintainers: ["Aleksei Matiushkin"],
+      licenses: ["MIT"],
+      links: %{
+        "GitHub" => "https://github.com/am-kantox/#{@app}",
+        "Docs" => "https://hexdocs.pm/#{@app}"
+      }
+    ]
+  end
+
+  defp docs do
+    [
+      main: "readme",
+      source_ref: "v#{@version}",
+      canonical: "http://hexdocs.pm/#{@app}",
+      logo: "stuff/cloister-48x48.png",
+      source_url: "https://github.com/am-kantox/#{@app}",
+      assets: "stuff/images",
+      extras: [],
+      groups_for_modules: []
     ]
   end
 end
