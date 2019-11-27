@@ -2,7 +2,7 @@ defmodule Cloister.MixProject do
   use Mix.Project
 
   @app :cloister
-  @version "0.1.1"
+  @version "0.1.2"
 
   def project do
     [
@@ -18,6 +18,12 @@ defmodule Cloister.MixProject do
       aliases: aliases(),
       xref: [exclude: []],
       docs: docs(),
+      releases: [
+        cloister: [
+          include_executables_for: [:unix],
+          applications: [logger: :permanent, runtime_tools: :permanent]
+        ]
+      ],
       dialyzer: [
         plt_file: {:no_warn, ".dialyzer/plts/dialyzer.plt"},
         ignore_warnings: ".dialyzer/ignore.exs"
@@ -30,7 +36,7 @@ defmodule Cloister.MixProject do
     [
       applications: [:logger, :libring],
       mod: {Cloister.Application, []},
-      refistered: [Cloister, Cloister.Node]
+      registered: [Cloister, Cloister.Node]
     ]
   end
 

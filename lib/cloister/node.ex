@@ -31,7 +31,7 @@ defmodule Cloister.Node do
   @doc false
   defp do_handle_quorum(true, %N{otp_app: otp_app} = state) do
     active_sentry =
-      for sentry <- Application.fetch_env!(otp_app, :sentry),
+      for sentry <- Application.get_env(otp_app, :sentry, [node()]),
           Node.connect(sentry),
           do: sentry
 
@@ -40,7 +40,7 @@ defmodule Cloister.Node do
        %N{
          state
          | alive?: true,
-           sentry?: Enum.member?(active_sentry, Node.self()),
+           sentry?: Enum.member?(active_sentry, node()),
            clustered?: true
        }}
     else
@@ -82,7 +82,7 @@ defmodule Cloister.Node do
       |> Enum.count()
       |> Kernel.+(1)
 
-    expected = Application.fetch_env!(state.otp_app, :consensus)
+    expected = Application.get_env(state.otp_app, :consensus, [node()])
 
     result =
       case connected - expected do
