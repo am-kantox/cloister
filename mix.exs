@@ -2,7 +2,7 @@ defmodule Cloister.MixProject do
   use Mix.Project
 
   @app :cloister
-  @version "0.1.2"
+  @version "0.1.3"
 
   def project do
     [
@@ -11,6 +11,7 @@ defmodule Cloister.MixProject do
       elixir: "~> 1.9",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      preferred_cli_env: ["test.cluster": :test],
       xref: [exclude: []],
       description: description(),
       package: package(),
