@@ -82,7 +82,7 @@ defmodule Cloister.Node do
       |> Enum.count()
       |> Kernel.+(1)
 
-    expected = Application.get_env(state.otp_app, :consensus, [node()])
+    expected = Application.get_env(state.otp_app, :consensus, 1)
 
     result =
       case connected - expected do
