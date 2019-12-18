@@ -21,4 +21,4 @@ jobs:
         MIX_ENV=ci mix deps.get
     - name: Run All Tests
       run: |
-        MIX_ENV=ci mix quality
+        MIX_ENV=ci mix quality.ci
