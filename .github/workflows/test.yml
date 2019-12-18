@@ -10,6 +10,11 @@ jobs:
     container:
       image: elixir:1.9.1-slim
 
+    services:
+      epmd:
+        ports:
+        - 4369:4369
+
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
