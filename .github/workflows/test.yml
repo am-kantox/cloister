@@ -8,11 +8,11 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: elixir:1.9.1-slim
+      image: elixir
 
     services:
       epmd:
-        image: epmd
+        image: elixir
         ports:
         - 4369:4369
 
