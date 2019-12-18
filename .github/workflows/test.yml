@@ -21,4 +21,5 @@ jobs:
       run: epmd -daemon
     - name: Run All Tests
       run: |
+        MIX_ENV=ci mix quality.ci
         MIX_ENV=ci mix test.cluster
