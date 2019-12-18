@@ -12,6 +12,7 @@ jobs:
 
     services:
       epmd:
+        image: epmd
         ports:
         - 4369:4369
 
