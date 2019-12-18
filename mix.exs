@@ -63,7 +63,7 @@ defmodule Cloister.MixProject do
       "quality.ci": [
         "format --check-formatted",
         "credo --strict",
-        "dialyzer --halt-exit-status"
+        "dialyzer"
       ],
       test: ["test.cluster"]
     ]

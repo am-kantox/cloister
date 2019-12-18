@@ -10,12 +10,6 @@ jobs:
     container:
       image: elixir
 
-    services:
-      epmd:
-        image: elixir
-        ports:
-        - 4369:4369
-
     steps:
     - uses: actions/checkout@v1
     - name: Install Dependencies
@@ -23,7 +17,9 @@ jobs:
         MIX_ENV=ci mix local.rebar --force
         MIX_ENV=ci mix local.hex --force
         MIX_ENV=ci mix deps.get
+    - name: Start EPMD
+      run: epmd -daemon
     - name: Run All Tests
       run: |
-        epmd -daemon
-        MIX_ENV=ci mix test
+        MIX_ENV=ci mix quality.ci
+        MIX_ENV=ci mix test.cluster
