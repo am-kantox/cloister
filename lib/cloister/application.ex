@@ -9,7 +9,7 @@ defmodule Cloister.Application do
     additional_modules =
       Enum.filter(
         Application.get_env(:cloister, :additional_modules, []),
-        &Code.ensure_compiled?/1
+        &ensure_compiled?/1
       )
 
     children =
@@ -18,9 +18,14 @@ defmodule Cloister.Application do
         Cloister.Node
       ] ++ additional_modules
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Cloister.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  defp ensure_compiled?(module) do
+    case Code.ensure_compiled(module) do
+      {:module, _module} -> true
+      {:error, _reason} -> false
+    end
   end
 end

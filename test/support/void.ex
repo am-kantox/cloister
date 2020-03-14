@@ -20,10 +20,27 @@ defmodule Cloister.Void do
   @impl GenServer
   def handle_cast({:ping_one, pid}, :ok) do
     if Cloister.mine?({:ping_one, pid}) do
-      IO.inspect({node(), {:ping, pid}}, label: "Received cast")
+      IO.inspect({node(), {:ping, pid}}, label: "Received cast [ONE]")
       GenServer.cast(pid, {:pong, self()})
     end
 
     {:noreply, :ok}
+  end
+
+  @impl GenServer
+  def handle_call({:ping, pid}, _from, :ok) do
+    IO.inspect({node(), {:ping, pid}}, label: "Received call")
+    GenServer.cast(pid, {:pong, self()})
+    {:reply, :ok, :ok}
+  end
+
+  @impl GenServer
+  def handle_call({:ping_one, pid}, _from, :ok) do
+    if Cloister.mine?({:ping_one, pid}) do
+      IO.inspect({node(), {:ping, pid}}, label: "Received call [ONE]")
+      GenServer.cast(pid, {:pong, self()})
+    end
+
+    {:reply, :ok, :ok}
   end
 end

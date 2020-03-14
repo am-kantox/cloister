@@ -67,6 +67,14 @@ defmodule Cloister.Node do
   def multicast(name, request),
     do: GenServer.abcast(name, request)
 
+  @spec multicall(nodes :: [node()], name :: GenServer.name(), request :: term()) ::
+          {replies :: [{node(), term()}], bad_nodes :: [node()]}
+  @doc """
+  Casts the request to all the nodes passed as a parameter.
+  """
+  def multicall(nodes \\ [node() | Node.list()], name, request),
+    do: GenServer.multi_call(nodes, name, request)
+
   ##############################################################################
 
   @impl GenServer
