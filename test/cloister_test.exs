@@ -2,7 +2,7 @@ defmodule CloisterTest do
   use ExUnit.Case
   doctest Cloister
 
-  @delay if Mix.env() == :ci, do: 5_000, else: 300
+  @delay if Mix.env() == :ci, do: 5_000, else: 500
 
   test "multicasts" do
     Cloister.multicast(Cloister.Void, {:ping, self()})
