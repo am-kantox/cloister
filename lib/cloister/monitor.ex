@@ -6,6 +6,7 @@ defmodule Cloister.Monitor do
   @type status :: :down | :starting | :up | :stopping | :panic
 
   @type t :: %{
+          __struct__: Cloister.Monitor,
           otp_app: atom(),
           status: status(),
           alive?: boolean(),
@@ -64,7 +65,6 @@ defmodule Cloister.Monitor do
       for sentry <- Application.get_env(otp_app, :sentry, [node()]),
           Node.connect(sentry),
           do: sentry
-    Logger.info("[🕸️] #{node()} 🏃‍♀️: [" <> inspect({otp_app, active_sentry}) <> "]")
 
     if active_sentry != [] do
       {:noreply,
