@@ -25,8 +25,8 @@ defmodule Cloister do
   @doc "Returns `true` if the hashring points to this node for the term given, `false` otherwise"
   def mine?(term), do: whois(term) == node()
 
-  defdelegate state, to: Cloister.Node
-  defdelegate siblings, to: Cloister.Node
+  defdelegate state, to: Cloister.Monitor
+  defdelegate siblings, to: Cloister.Monitor
   defdelegate multicast(name, request), to: Cloister.Node
   defdelegate multicall(name, request), to: Cloister.Node
   defdelegate multicall(nodes, name, request), to: Cloister.Node

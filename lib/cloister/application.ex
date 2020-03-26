@@ -6,10 +6,6 @@ defmodule Cloister.Application do
   #! TODO MOVE MONKS UNDER CLOISTER SUPERVISION
   def start(_type, _args) do
     :ok = Application.ensure_started(:libring, :permanent)
-    HashRing.Managed.new(:cloister, monitor_nodes: true)
-
-    monks = generate_agents()
-    HashRing.Managed.new(:monks, nodes: monks)
 
     additional_modules =
       Enum.filter(
@@ -20,16 +16,12 @@ defmodule Cloister.Application do
     children =
       [
         Cloister,
+        {Cloister.Monitor, [state: [otp_app: :cloister]]},
         Cloister.Node
-      ] ++ monks ++ additional_modules
+      ] ++ additional_modules
 
     opts = [strategy: :one_for_one, name: Cloister.Supervisor]
     Supervisor.start_link(children, opts)
-  end
-
-  defp generate_agents() do
-    count = Application.get_env(:cloister, :agents, 3)
-    Enum.map(1..count, &Cloister.Agent.agent!("R#{&1}"))
   end
 
   defp ensure_compiled?(module) do

@@ -3,64 +3,23 @@ defmodule Cloister.Node do
   The state of the cloister. This process runs under supervision and makes sure
   the cluster is up-to-date with the expectations.
   """
-  alias Cloister.Node, as: N
 
   use GenServer
 
-  defstruct otp_app: :cloister, clustered?: false, sentry?: false, alive?: false
-
-  @typedoc "Internal representation of the Node managed by Cloister"
-  @type t :: %__MODULE__{}
-
   @doc false
-  def start_link(opts \\ []),
-    do: GenServer.start_link(__MODULE__, struct(Cloister.Node, opts), name: __MODULE__)
+  def start_link(opts \\ []) do
+    {state, opts} = Keyword.pop(opts, :state, [])
 
-  @impl GenServer
-  @doc false
-  def init(state), do: {:ok, state, {:continue, :quorum}}
-
-  @impl GenServer
-  @doc false
-  def handle_continue(:quorum, %N{} = state),
-    do: do_handle_quorum(Node.alive?(), state)
-
-  @spec do_handle_quorum(boolean(), state :: t()) ::
-          {:noreply, new_state} | {:noreply, new_state, {:continue, term()}}
-        when new_state: term()
-  @doc false
-  defp do_handle_quorum(true, %N{otp_app: otp_app} = state) do
-    active_sentry =
-      for sentry <- Application.get_env(otp_app, :sentry, [node()]),
-          Node.connect(sentry),
-          do: sentry
-
-    if active_sentry != [] do
-      {:noreply,
-       %N{
-         state
-         | alive?: true,
-           sentry?: Enum.member?(active_sentry, node()),
-           clustered?: true
-       }}
-    else
-      {:noreply, state, {:continue, :quorum}}
-    end
+    GenServer.start_link(
+      __MODULE__,
+      state,
+      Keyword.put_new(opts, :name, __MODULE__)
+    )
   end
 
+  @impl GenServer
   @doc false
-  defp do_handle_quorum(false, state),
-    do: {:noreply, %N{state | sentry?: true, clustered?: false}}
-
-  ##############################################################################
-
-  @spec state :: t()
-  @doc "Returns an internal state of the Node"
-  def state, do: GenServer.call(__MODULE__, :state)
-
-  @spec siblings :: boolean()
-  @doc "Returns whether the requested amount of nodes in the cluster are connected"
-  def siblings, do: GenServer.call(__MODULE__, :siblings)
+  def init(state), do: {:ok, state}
 
   @spec multicast(name :: GenServer.name(), request :: term()) :: :abcast
   @doc "Casts the request to all the nodes connected to this node"
@@ -74,31 +33,4 @@ defmodule Cloister.Node do
   """
   def multicall(nodes \\ [node() | Node.list()], name, request),
     do: GenServer.multi_call(nodes, name, request)
-
-  ##############################################################################
-
-  @impl GenServer
-  @doc false
-  def handle_call(:state, _from, state), do: {:reply, state, state}
-
-  @impl GenServer
-  @doc false
-  def handle_call(:siblings, _from, state) do
-    connected =
-      :connected
-      |> Elixir.Node.list()
-      |> Enum.count()
-      |> Kernel.+(1)
-
-    expected = Application.get_env(state.otp_app, :consensus, 1)
-
-    result =
-      case connected - expected do
-        0 -> :ok
-        i when i > 0 -> {:ok, [expected: expected, connected: connected]}
-        i when i < 0 -> {:error, [expected: expected, connected: connected]}
-      end
-
-    {:reply, result, state}
-  end
 end
