@@ -3,7 +3,7 @@ defmodule Cloister.Monitor do
   use GenServer
   require Logger
 
-  @type status :: :down | :starting | :up | :stopping | :panic
+  @type status :: :down | :starting | :up | :stopping | :rehashing | :panic
 
   @type t :: %{
           __struct__: Cloister.Monitor,
@@ -13,15 +13,21 @@ defmodule Cloister.Monitor do
           alive?: boolean(),
           clustered?: boolean(),
           sentry?: boolean(),
-          ring: HashRing.t()
+          ring: atom()
         }
 
-  defstruct otp_app: :cloister, started_at: nil, status: :down, alive?: false,
-            clustered?: false, sentry?: false, ring: nil
+  defstruct otp_app: :cloister,
+            started_at: nil,
+            status: :down,
+            alive?: false,
+            clustered?: false,
+            sentry?: false,
+            ring: nil
 
   alias Cloister.Monitor, as: Mon
 
-  @refresh_rate 10_000 # millis
+  # millis
+  @refresh_rate 10_000
 
   @spec start_link(opts :: keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -68,11 +74,14 @@ defmodule Cloister.Monitor do
       for sentry <- Application.get_env(otp_app, :sentry, [node()]),
           Node.connect(sentry),
           do: sentry
+
     Process.send_after(self(), :update_node_list, @refresh_rate)
 
     if active_sentry != [] do
       case Code.ensure_compiled(Cloister.Monitor.Info) do
-        {:module, _} -> :ok
+        {:module, _} ->
+          :ok
+
         _ ->
           ast =
             quote do
@@ -87,8 +96,10 @@ defmodule Cloister.Monitor do
                 end
               end
             end
+
           Module.create(Cloister.Monitor.Info, ast, Macro.Env.location(__ENV__))
       end
+
       {:noreply,
        %Mon{
          state
@@ -131,13 +142,20 @@ defmodule Cloister.Monitor do
 
   @impl GenServer
   def handle_info({:nodeup, node, info}, state) do
-    Logger.info("[🕸️ @#{node()}] #{node} ⬆️: [" <> inspect(info) <> "], state: [" <> inspect(state) <> "]")
+    Logger.info(
+      "[🕸️ @#{node()}] #{node} ⬆️: [" <> inspect(info) <> "], state: [" <> inspect(state) <> "]"
+    )
+
     {:noreply, update_state(state)}
   end
 
   @impl GenServer
   def handle_info({:nodedown, node, info}, state) do
-    Logger.info("[🕸️ @#{node()}] #{node} ⬇️ info: [" <> inspect(info) <> "], state: [" <> inspect(state) <> "]")
+    Logger.info(
+      "[🕸️ @#{node()}] #{node} ⬇️ info: [" <>
+        inspect(info) <> "], state: [" <> inspect(state) <> "]"
+    )
+
     {:noreply, update_state(state)}
   end
 
@@ -184,13 +202,17 @@ defmodule Cloister.Monitor do
 
     status =
       case {ring -- nodes, nodes -- ring} do
-        {[], []} -> :up
+        {[], []} ->
+          :up
+
         {[], to_ring} ->
           Enum.each(to_ring, &HashRing.Managed.add_node(state.ring, &1))
           :rehashing
+
         {from_ring, []} ->
           Enum.each(from_ring, &HashRing.Managed.remove_node(state.ring, &1))
           :rehashing
+
         {from_ring, to_ring} ->
           Enum.each(from_ring, &HashRing.Managed.remove_node(state.ring, &1))
           Enum.each(to_ring, &HashRing.Managed.add_node(state.ring, &1))
