@@ -19,7 +19,7 @@ defmodule Cloister do
 
   @spec whois(term :: any()) :: node() | {:error, :no_such_ring}
   @doc "Returns who would be chosen by a hash ring for the term"
-  def whois(term), do: HashRing.Managed.key_to_node(:cloister, term)
+  def whois(term), do: apply(Cloister.Monitor.Info, :whois, [term])
 
   @spec mine?(term :: any()) :: boolean() | {:error, :no_such_ring}
   @doc "Returns `true` if the hashring points to this node for the term given, `false` otherwise"
