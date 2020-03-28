@@ -16,7 +16,7 @@ defmodule Cloister.Application do
     children =
       [
         Cloister,
-        {Cloister.Monitor, [state: [otp_app: :cloister]]},
+        {Cloister.Monitor, [state: [listener: Cloister.Listener.Default, otp_app: :cloister]]},
         Cloister.Node
       ] ++ additional_modules
 

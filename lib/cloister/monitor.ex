@@ -8,6 +8,7 @@ defmodule Cloister.Monitor do
   @type t :: %{
           __struct__: Cloister.Monitor,
           otp_app: atom(),
+          listener: module(),
           started_at: DateTime.t(),
           status: status(),
           alive?: boolean(),
@@ -17,6 +18,7 @@ defmodule Cloister.Monitor do
         }
 
   defstruct otp_app: :cloister,
+            listener: nil,
             started_at: nil,
             status: :down,
             alive?: false,
@@ -61,6 +63,13 @@ defmodule Cloister.Monitor do
   end
 
   @impl GenServer
+  def terminate(reason, %Mon{} = state) do
+    Logger.warn("[🕸️ #{node()}] ⏹️ reason: [#{reason}], state: [" <> inspect(state) <> "]")
+    state = notify(:stopping, state)
+    notify(:down, state)
+  end
+
+  @impl GenServer
   @doc false
   def handle_continue(:quorum, %Mon{} = state),
     do: do_handle_quorum(Node.alive?(), state)
@@ -74,8 +83,6 @@ defmodule Cloister.Monitor do
       for sentry <- Application.get_env(otp_app, :sentry, [node()]),
           Node.connect(sentry),
           do: sentry
-
-    Process.send_after(self(), :update_node_list, @refresh_rate)
 
     if active_sentry != [] do
       case Code.ensure_compiled(Cloister.Monitor.Info) do
@@ -100,21 +107,22 @@ defmodule Cloister.Monitor do
           Module.create(Cloister.Monitor.Info, ast, Macro.Env.location(__ENV__))
       end
 
-      {:noreply,
-       %Mon{
-         state
-         | alive?: true,
-           sentry?: Enum.member?(active_sentry, node()),
-           clustered?: true
-       }}
+      state = %Mon{
+        state
+        | alive?: true,
+          sentry?: Enum.member?(active_sentry, node()),
+          clustered?: true
+      }
+
+      {:noreply, notify(:up, state)}
     else
       {:noreply, state, {:continue, :quorum}}
     end
   end
 
   @doc false
-  defp do_handle_quorum(false, state),
-    do: {:noreply, %Mon{state | sentry?: true, clustered?: false}}
+  defp do_handle_quorum(false, %Mon{} = state),
+    do: {:noreply, notify(:up, %Mon{state | sentry?: true, clustered?: false})}
 
   ##############################################################################
 
@@ -134,16 +142,14 @@ defmodule Cloister.Monitor do
 
   @impl GenServer
   def handle_info(:update_node_list, state) do
-    Logger.debug("[🕸️ @#{node()}] 🔄 state: [" <> inspect(state) <> "]")
-
-    Process.send_after(self(), :update_node_list, @refresh_rate)
+    # Logger.debug("[🕸️ #{node()}] 🔄 state: [" <> inspect(state) <> "]")
     {:noreply, update_state(state)}
   end
 
   @impl GenServer
   def handle_info({:nodeup, node, info}, state) do
     Logger.info(
-      "[🕸️ @#{node()}] #{node} ⬆️: [" <> inspect(info) <> "], state: [" <> inspect(state) <> "]"
+      "[🕸️ #{node()}] #{node} ⬆️: [" <> inspect(info) <> "], state: [" <> inspect(state) <> "]"
     )
 
     {:noreply, update_state(state)}
@@ -152,7 +158,7 @@ defmodule Cloister.Monitor do
   @impl GenServer
   def handle_info({:nodedown, node, info}, state) do
     Logger.info(
-      "[🕸️ @#{node()}] #{node} ⬇️ info: [" <>
+      "[🕸️ #{node()}] #{node} ⬇️ info: [" <>
         inspect(info) <> "], state: [" <> inspect(state) <> "]"
     )
 
@@ -176,22 +182,6 @@ defmodule Cloister.Monitor do
     state = update_state(state)
     {:reply, state, state}
   end
-
-  # @impl GenServer
-  # @doc false
-  # def handle_cast({:spawn, {m, f, a}}, state) when is_atom(m) and is_atom(f) and is_list(a) do
-  #   state = update_state(state)
-  #   apply(m, f, a)
-  #   {:noreply, state}
-  # end
-
-  # @impl GenServer
-  # @doc false
-  # def handle_cast({:spawn, f}, state) when is_function(f, 0) do
-  #   state = update_state(state)
-  #   f.()
-  #   {:noreply, state}
-  # end
 
   @spec update_state(state :: t()) :: t()
   defp update_state(%Mon{} = state) do
@@ -219,6 +209,21 @@ defmodule Cloister.Monitor do
           :panic
       end
 
-    %Mon{state | status: status}
+    notify(status, state)
+  end
+
+  @spec notify(to :: status(), state :: t()) :: t()
+  defp notify(to, %{status: to} = state), do: reschedule(state)
+
+  defp notify(to, %{status: from} = state) do
+    state = %Mon{state | status: to}
+    apply(state.listener, :on_state_change, [from, state])
+    reschedule(state)
+  end
+
+  @spec reschedule(state :: t()) :: t()
+  defp reschedule(state) do
+    Process.send_after(self(), :update_node_list, @refresh_rate)
+    state
   end
 end
