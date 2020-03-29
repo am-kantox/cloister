@@ -3,31 +3,50 @@ defmodule Cloister.Application do
 
   use Application
 
-  #! TODO MOVE MONKS UNDER CLOISTER SUPERVISION
+  require Logger
+
+  @consensus 3
+  @consensus_timeout 3_000
+
+  @impl Application
   def start(_type, _args) do
-    :ok = Application.ensure_started(:libring, :permanent)
-
-    additional_modules =
-      Enum.filter(
-        Application.get_env(:cloister, :additional_modules, []),
-        &ensure_compiled?/1
-      )
-
-    children =
-      [
-        Cloister,
-        {Cloister.Monitor, [state: [listener: Cloister.Listener.Default, otp_app: :cloister]]},
-        Cloister.Node
-      ] ++ additional_modules
+    children = [
+      {Cloister.Manager, [state: [listener: Cloister.Listener.Default, otp_app: :cloister]]}
+    ]
 
     opts = [strategy: :one_for_one, name: Cloister.Supervisor]
     Supervisor.start_link(children, opts)
   end
 
-  defp ensure_compiled?(module) do
-    case Code.ensure_compiled(module) do
-      {:module, _module} -> true
-      {:error, _reason} -> false
-    end
+  @impl Application
+  def prep_stop(_state),
+    do: Cloister.Monitor.terminate({:shutdown, :application}, Cloister.Monitor.state())
+
+  @impl Application
+  def start_phase(:warming_up, _start_type, phase_args) do
+    phase_args
+    |> Keyword.get(:consensus, Application.get_env(:cloister, :consensus, @consensus))
+    |> wait_consensus()
+  end
+
+  @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
+  defp wait_consensus(consensus, retries \\ 1) do
+      nodes = apply(Cloister.Monitor.Info, :nodes, [])
+
+      nodes
+      |> Enum.count()
+      |> case do
+        n when n < consensus ->
+          message = "[🕸️ #{node()}] ⏳ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]"
+          case div(retries, 10) do
+            0 -> Logger.warn(message)
+            _ -> Logger.debug(message)
+          end
+          Process.sleep(@consensus_timeout)
+          wait_consensus(consensus, retries + 1)
+        _ ->
+          Logger.info("[🕸️ #{node()}] ⌛ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]")
+      end
+
   end
 end

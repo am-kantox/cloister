@@ -37,6 +37,7 @@ defmodule Cloister.MixProject do
     [
       applications: [:logger, :libring],
       mod: {Cloister.Application, []},
+      start_phases: [{:warming_up, []}],
       registered: [Cloister, Cloister.Node]
     ]
   end

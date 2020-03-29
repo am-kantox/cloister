@@ -12,5 +12,5 @@ defmodule Cloister.Listener do
   @callback on_state_change(
               from :: Cloister.Monitor.status(),
               state :: Cloister.Monitor.t()
-            ) :: :allow | :deny
+            ) :: :ok
 end

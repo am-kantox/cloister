@@ -29,7 +29,7 @@ defmodule Cloister.Monitor do
   alias Cloister.Monitor, as: Mon
 
   # millis
-  @refresh_rate 10_000
+  @refresh_rate 1_000
 
   @spec start_link(opts :: keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -92,6 +92,7 @@ defmodule Cloister.Monitor do
         _ ->
           ast =
             quote do
+              @spec whois(term :: term()) :: node()
               def whois(term) do
                 case HashRing.Managed.key_to_node(unquote(state.ring), term) do
                   {:error, {:invalid_ring, :no_nodes}} ->
@@ -101,6 +102,11 @@ defmodule Cloister.Monitor do
                   node ->
                     node
                 end
+              end
+
+              @spec nodes :: [term()]
+              def nodes do
+                HashRing.Managed.nodes(unquote(state.ring))
               end
             end
 

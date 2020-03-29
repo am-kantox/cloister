@@ -1,8 +1,5 @@
 defmodule Cloister.Node do
-  @moduledoc """
-  The state of the cloister. This process runs under supervision and makes sure
-  the cluster is up-to-date with the expectations.
-  """
+  @moduledoc false
 
   use GenServer
 
