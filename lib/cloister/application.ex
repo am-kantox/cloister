@@ -11,7 +11,7 @@ defmodule Cloister.Application do
   @impl Application
   def start(_type, _args) do
     children = [
-      {Cloister.Manager, [state: [listener: Cloister.Listener.Default, otp_app: :cloister]]}
+      Cloister.Manager
     ]
 
     opts = [strategy: :one_for_one, name: Cloister.Supervisor]
