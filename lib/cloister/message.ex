@@ -1,5 +1,5 @@
 defmodule Cloister.Message do
-  @moduledoc "The message to be used in multicall requests"
+  @moduledoc false
 
   @typedoc "Stage of message round-robin passing, a map of stage numbers to hashes"
   @type stages :: %{required(non_neg_integer()) => binary()}

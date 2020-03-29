@@ -1,4 +1,5 @@
 defmodule Cloister.Manager do
+  @moduledoc false
   use Supervisor
 
   @spec start_link(opts :: keyword()) :: GenServer.on_start()

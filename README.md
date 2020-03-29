@@ -9,7 +9,7 @@
 ```elixir
 def deps do
   [
-    {:cloister, "~> 0.1"},
+    {:cloister, "~> 0.2"},
     ...
   ]
 end
@@ -21,14 +21,14 @@ end
 config :cloister,
   sentry: ~w|node1@127.0.0.1 node2@127.0.0.1|a,
   consensus: 2
-
-config :libring,
-  rings: [
-    cloister: [monitor_nodes: true]
-  ]
 ```
 
 * Make sure `:cloister` application is started. This does not require any action unless you have the list of applications specified explicitly. If so, add `:cloister` there.
+
+## Changelog
+
+- **`0.2.0`** use `Application.start_phases/3` callback to postpone application start until the consensus is reached
+
 
 ---
 
