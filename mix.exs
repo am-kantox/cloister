@@ -2,7 +2,7 @@ defmodule Cloister.MixProject do
   use Mix.Project
 
   @app :cloister
-  @version "0.2.0"
+  @version "0.2.1"
 
   def project do
     [
@@ -50,7 +50,6 @@ defmodule Cloister.MixProject do
   defp deps do
     [
       {:libring, "~> 1.0"},
-      {:agency, "~> 0.1"},
       # dev / test
       {:credo, "~> 1.0", only: [:dev, :ci]},
       {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci]},
