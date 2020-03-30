@@ -31,22 +31,24 @@ defmodule Cloister.Application do
 
   @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
   defp wait_consensus(consensus, retries \\ 1) do
-      nodes = apply(Cloister.Monitor.Info, :nodes, [])
+    nodes = apply(Cloister.Monitor.Info, :nodes, [])
 
-      nodes
-      |> Enum.count()
-      |> case do
-        n when n < consensus ->
-          message = "[🕸️ #{node()}] ⏳ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]"
-          case div(retries, 10) do
-            0 -> Logger.warn(message)
-            _ -> Logger.debug(message)
-          end
-          Process.sleep(@consensus_timeout)
-          wait_consensus(consensus, retries + 1)
-        _ ->
-          Logger.info("[🕸️ #{node()}] ⌛ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]")
-      end
+    nodes
+    |> Enum.count()
+    |> case do
+      n when n < consensus ->
+        message = "[🕸️ #{node()}] ⏳ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]"
 
+        case div(retries, 10) do
+          0 -> Logger.warn(message)
+          _ -> Logger.debug(message)
+        end
+
+        Process.sleep(@consensus_timeout)
+        wait_consensus(consensus, retries + 1)
+
+      _ ->
+        Logger.info("[🕸️ #{node()}] ⌛ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]")
+    end
   end
 end
