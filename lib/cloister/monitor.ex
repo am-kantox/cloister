@@ -64,7 +64,10 @@ defmodule Cloister.Monitor do
 
   @impl GenServer
   def terminate(reason, %Mon{} = state) do
-    Logger.warn("[🕸️ #{node()}] ⏹️ reason: [" <> inspect(reason) <> "], state: [" <> inspect(state) <> "]")
+    Logger.warn(
+      "[🕸️ #{node()}] ⏹️ reason: [" <> inspect(reason) <> "], state: [" <> inspect(state) <> "]"
+    )
+
     state = notify(:stopping, state)
     notify(:down, state)
   end
