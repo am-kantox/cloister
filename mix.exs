@@ -50,7 +50,6 @@ defmodule Cloister.MixProject do
   defp deps do
     [
       {:libring, "~> 1.0"},
-      {:agency, "~> 0.1"},
       # dev / test
       {:credo, "~> 1.0", only: [:dev, :ci]},
       {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci]},
