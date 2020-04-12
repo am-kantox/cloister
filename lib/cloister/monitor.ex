@@ -6,7 +6,7 @@ defmodule Cloister.Monitor do
 
   require Logger
 
-  @type status :: :down | :starting | :up | :stopping | :rehashing | :panic
+  @type status :: :down | :starting | :joined | :up | :stopping | :rehashing | :panic
 
   @type t :: %{
           __struct__: Cloister.Monitor,
@@ -32,7 +32,7 @@ defmodule Cloister.Monitor do
   alias Cloister.Monitor, as: Mon
 
   # millis
-  @refresh_rate 1_000
+  @refresh_rate 300
 
   @spec start_link(opts :: keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
@@ -98,7 +98,7 @@ defmodule Cloister.Monitor do
           clustered?: true
       }
 
-      {:noreply, notify(:up, state)}
+      {:noreply, notify(:joined, state)}
     else
       {:noreply, state, {:continue, :quorum}}
     end
