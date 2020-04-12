@@ -2,6 +2,8 @@ defmodule Cloister.Modules do
   @moduledoc false
 
   defmodule Stubs do
+    use Boundary, deps: [], exports: []
+
     @moduledoc false
     @doc false
     @spec create_info_module(ring :: term(), name :: module()) :: module()
@@ -64,6 +66,8 @@ defmodule Cloister.Modules do
       end
     end
   end
+
+  use Boundary, deps: [Stubs], exports: []
 
   @compile {:inline, info_module: 0, listener_module: 0}
 

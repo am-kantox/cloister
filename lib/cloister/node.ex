@@ -3,6 +3,8 @@ defmodule Cloister.Node do
 
   use GenServer
 
+  use Boundary, deps: [], exports: []
+
   @doc false
   def start_link(opts \\ []) do
     {state, opts} = Keyword.pop(opts, :state, [])

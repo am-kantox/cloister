@@ -1,6 +1,9 @@
 defmodule Cloister.Monitor do
   @moduledoc false
   use GenServer
+
+  use Boundary, deps: [], exports: []
+
   require Logger
 
   @type status :: :down | :starting | :up | :stopping | :rehashing | :panic

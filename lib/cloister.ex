@@ -3,6 +3,8 @@ defmodule Cloister do
   `Cloister` is a consensus helper for clusters.
   """
 
+  use Boundary, deps: [Cloister.{Modules, Monitor, Node}], exports: []
+
   use DynamicSupervisor
 
   @spec start_link(opts :: keyword()) :: Supervisor.on_start()

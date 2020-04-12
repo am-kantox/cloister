@@ -10,6 +10,7 @@ defmodule Cloister.MixProject do
       version: @version,
       elixir: "~> 1.9",
       elixirc_paths: elixirc_paths(Mix.env()),
+      compilers: [:boundary | Mix.compilers()],
       start_permanent: Mix.env() == :prod,
       preferred_cli_env: ["test.cluster": :test],
       xref: [exclude: []],
@@ -45,11 +46,12 @@ defmodule Cloister.MixProject do
   defp deps do
     [
       {:libring, "~> 1.0"},
+      {:boundary, "~> 0.4", runtime: false},
       # dev / test
-      {:credo, "~> 1.0", only: [:dev, :ci]},
-      {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci]},
+      {:credo, "~> 1.0", only: [:dev, :ci], runtime: false},
+      {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci], runtime: false},
       {:dialyxir, "~> 1.0.0-rc.6", only: [:dev, :test, :ci], runtime: false},
-      {:ex_doc, "~> 0.11", only: :dev}
+      {:ex_doc, "~> 0.11", only: :dev, runtime: false}
     ]
   end
 
