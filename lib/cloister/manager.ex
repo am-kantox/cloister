@@ -14,7 +14,7 @@ defmodule Cloister.Manager do
   def init(state) do
     state =
       state
-      |> Keyword.put_new(:listener, Cloister.Listener.Default)
+      |> Keyword.put_new(:listener, Cloister.Modules.listener_module())
       |> Keyword.put_new(:otp_app, :cloister)
 
     {additional_modules, state} =
@@ -37,5 +37,5 @@ defmodule Cloister.Manager do
   end
 
   defp ensure_compiled?(module),
-    do: match?({:module, _module}, Code.ensure_compiled(module))
+    do: match?({:module, ^module}, Code.ensure_compiled(module))
 end

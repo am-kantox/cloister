@@ -31,7 +31,7 @@ defmodule Cloister.Application do
 
   @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
   defp wait_consensus(consensus, retries \\ 1) do
-    nodes = apply(Cloister.Monitor.Info, :nodes, [])
+    nodes = Cloister.Modules.info_module().nodes()
 
     nodes
     |> Enum.count()

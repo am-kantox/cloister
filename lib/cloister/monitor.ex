@@ -88,34 +88,6 @@ defmodule Cloister.Monitor do
           do: sentry
 
     if active_sentry != [] do
-      case Code.ensure_compiled(Cloister.Monitor.Info) do
-        {:module, _} ->
-          :ok
-
-        _ ->
-          ast =
-            quote do
-              @spec whois(term :: term()) :: node()
-              def whois(term) do
-                case HashRing.Managed.key_to_node(unquote(state.ring), term) do
-                  {:error, {:invalid_ring, :no_nodes}} ->
-                    Cloister.Monitor.nodes!()
-                    whois(term)
-
-                  node ->
-                    node
-                end
-              end
-
-              @spec nodes :: [term()]
-              def nodes do
-                HashRing.Managed.nodes(unquote(state.ring))
-              end
-            end
-
-          Module.create(Cloister.Monitor.Info, ast, Macro.Env.location(__ENV__))
-      end
-
       state = %Mon{
         state
         | alive?: true,
@@ -131,7 +103,7 @@ defmodule Cloister.Monitor do
 
   @doc false
   defp do_handle_quorum(false, %Mon{} = state),
-    do: {:noreply, notify(:up, %Mon{state | sentry?: true, clustered?: false})}
+    do: {:noreply, notify(:rehashing, %Mon{state | sentry?: true, clustered?: false})}
 
   ##############################################################################
 
@@ -194,8 +166,6 @@ defmodule Cloister.Monitor do
 
   @spec update_state(state :: t()) :: t()
   defp update_state(%Mon{} = state) do
-    # consensus = Application.get_env(state.otp_app, :consensus, 1)
-
     ring = HashRing.Managed.nodes(state.ring)
     nodes = [node() | Node.list()]
 
