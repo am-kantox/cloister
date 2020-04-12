@@ -10,7 +10,7 @@ defmodule Cloister.MixProject do
       version: @version,
       elixir: "~> 1.9",
       elixirc_paths: elixirc_paths(Mix.env()),
-      compilers: [:boundary | Mix.compilers()],
+      compilers: compilers(Mix.env()),
       start_permanent: Mix.env() == :prod,
       preferred_cli_env: ["test.cluster": :test],
       xref: [exclude: []],
@@ -39,7 +39,7 @@ defmodule Cloister.MixProject do
       applications: [:logger, :libring],
       mod: {Cloister.Application, []},
       start_phases: [{:warming_up, []}],
-      registered: [Cloister, Cloister.Node]
+      registered: [Cloister, Cloister.Node, Cloister.Manager]
     ]
   end
 
@@ -48,9 +48,9 @@ defmodule Cloister.MixProject do
       {:libring, "~> 1.0"},
       {:boundary, "~> 0.4", runtime: false},
       # dev / test
+      {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci]},
+      {:dialyxir, "~> 1.0.0", only: [:dev, :test, :ci]},
       {:credo, "~> 1.0", only: [:dev, :ci], runtime: false},
-      {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci], runtime: false},
-      {:dialyxir, "~> 1.0.0-rc.6", only: [:dev, :test, :ci], runtime: false},
       {:ex_doc, "~> 0.11", only: :dev, runtime: false}
     ]
   end
@@ -102,6 +102,9 @@ defmodule Cloister.MixProject do
       groups_for_modules: []
     ]
   end
+
+  def compilers(:dev), do: [:boundary | Mix.compilers()]
+  def compilers(_), do: Mix.compilers()
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(:ci), do: ["lib", "test/support"]
