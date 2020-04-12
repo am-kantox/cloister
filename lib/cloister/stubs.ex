@@ -15,6 +15,8 @@ defmodule Cloister.Modules do
         _ ->
           ast =
             quote do
+              @moduledoc false
+
               @spec whois(term :: term()) :: node()
               def whois(term) do
                 case HashRing.Managed.key_to_node(unquote(ring), term) do
