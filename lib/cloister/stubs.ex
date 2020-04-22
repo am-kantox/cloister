@@ -35,14 +35,14 @@ defmodule Cloister.Modules do
               end
             end
 
-            Module.create(name, ast, Macro.Env.location(__ENV__))
-            Application.put_env(:cloister, :monitor, name, persistent: true)
-            name
-        end
+          Module.create(name, ast, Macro.Env.location(__ENV__))
+          Application.put_env(:cloister, :monitor, name, persistent: true)
+          name
+      end
     end
 
     @doc false
-    @spec create_listener_module(ring :: term(), name :: binary()) :: module()
+    @spec create_listener_module(ring :: term(), name :: module()) :: module()
     def create_listener_module(ring, name \\ Cloister.Listener.Default) do
       case Code.ensure_compiled(name) do
         {:module, ^name} ->
@@ -51,17 +51,19 @@ defmodule Cloister.Modules do
         _ ->
           ast =
             quote do
-                @moduledoc false
+              @moduledoc false
 
-                @behaviour Cloister.Listener
-                require Logger
+              @behaviour Cloister.Listener
+              require Logger
 
-                def on_state_change(from, state) do
-                  Logger.debug(
-                    "[🕸️ #{inspect(unquote(ring))} #{node()}] 🔄 from: #{from}, state: " <> inspect(state)
-                  )
+              def on_state_change(from, state) do
+                Logger.debug(
+                  "[🕸️ #{inspect(unquote(ring))} #{node()}] 🔄 from: #{from}, state: " <>
+                    inspect(state)
+                )
               end
             end
+
           Module.create(name, ast, Macro.Env.location(__ENV__))
           Application.put_env(:cloister, :listener, name, persistent: true)
           name
