@@ -93,7 +93,7 @@ defmodule Cloister.Monitor do
           case :inet_tcp.getaddrs(service) do
             {:ok, ip_list} ->
               for {a, b, c, d} <- ip_list,
-                  sentry <- :"#{app_name}@#{a}.#{b}.#{c}.#{d}",
+                  sentry = :"#{app_name}@#{a}.#{b}.#{c}.#{d}",
                   Node.connect(sentry),
                   do: sentry
 
