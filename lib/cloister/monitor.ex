@@ -85,10 +85,32 @@ defmodule Cloister.Monitor do
         when new_state: t()
   @doc false
   defp do_handle_quorum(true, %Mon{otp_app: otp_app} = state) do
+    app_name = Application.get_env(otp_app, :app, otp_app)
+
     active_sentry =
-      for sentry <- Application.get_env(otp_app, :sentry, [node()]),
-          Node.connect(sentry),
-          do: sentry
+      case Application.get_env(otp_app, :sentry, [node()]) do
+        service when is_atom(service) ->
+          case :inet_tcp.getaddrs(service) do
+            {:ok, ip_list} ->
+              for {a, b, c, d} <- ip_list,
+                  sentry <- :"#{app_name}@#{a}.#{b}.#{c}.#{d}",
+                  Node.connect(sentry),
+                  do: sentry
+
+            {:error, reason} ->
+              Logger.warn(
+                "[🕸️ #{inspect(service)}] #{node()} ❓: cannot resolve service name.\n\tReason: " <>
+                  inspect(reason) <> ".\n\tState: " <> inspect(state) <> "."
+              )
+
+              []
+          end
+
+        [_ | _] = node_list ->
+          for sentry <- node_list,
+              Node.connect(sentry),
+              do: sentry
+      end
 
     if active_sentry != [] do
       state = %Mon{
