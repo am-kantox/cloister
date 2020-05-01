@@ -14,8 +14,10 @@ defmodule Cloister.Manager do
   def init(state) do
     state =
       state
+      |> Keyword.put_new(:otp_app, Application.get_env(:cloister, :otp_app, :cloister))
       |> Keyword.put_new(:listener, Cloister.Modules.listener_module())
-      |> Keyword.put_new(:otp_app, :cloister)
+
+    {monitor_opts, state} = Keyword.pop(state, :monitor_opts, [])
 
     {additional_modules, state} =
       Keyword.pop(
@@ -28,7 +30,7 @@ defmodule Cloister.Manager do
 
     children =
       [
-        {Cloister.Monitor, [state: state]},
+        {Cloister.Monitor, [{:state, state} | monitor_opts]},
         Cloister,
         Cloister.Node
       ] ++ additional_modules

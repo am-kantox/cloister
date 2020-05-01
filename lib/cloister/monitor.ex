@@ -61,7 +61,8 @@ defmodule Cloister.Monitor do
       |> Keyword.put_new(:status, :starting)
       |> Keyword.put_new(:ring, otp_app)
 
-    :ok = :net_kernel.monitor_nodes(true, node_type: :all)
+    net_kernel_magic(otp_app)
+
     {:ok, struct(__MODULE__, state), {:continue, :quorum}}
   end
 
@@ -85,44 +86,19 @@ defmodule Cloister.Monitor do
         when new_state: t()
   @doc false
   defp do_handle_quorum(true, %Mon{otp_app: otp_app} = state) do
-    app_name = Application.get_env(otp_app, :app, otp_app)
+    case active_sentry(otp_app) do
+      [] ->
+        {:noreply, state, {:continue, :quorum}}
 
-    active_sentry =
-      case Application.get_env(otp_app, :sentry, [node()]) do
-        service when is_atom(service) ->
-          case :inet_tcp.getaddrs(service) do
-            {:ok, ip_list} ->
-              for {a, b, c, d} <- ip_list,
-                  sentry = :"#{app_name}@#{a}.#{b}.#{c}.#{d}",
-                  Node.connect(sentry),
-                  do: sentry
+      [_ | _] = active_sentry ->
+        state = %Mon{
+          state
+          | alive?: true,
+            sentry?: Enum.member?(active_sentry, node()),
+            clustered?: true
+        }
 
-            {:error, reason} ->
-              Logger.warn(
-                "[🕸️ #{inspect(service)}] #{node()} ❓: cannot resolve service name.\n\tReason: " <>
-                  inspect(reason) <> ".\n\tState: " <> inspect(state) <> "."
-              )
-
-              []
-          end
-
-        [_ | _] = node_list ->
-          for sentry <- node_list,
-              Node.connect(sentry),
-              do: sentry
-      end
-
-    if active_sentry != [] do
-      state = %Mon{
-        state
-        | alive?: true,
-          sentry?: Enum.member?(active_sentry, node()),
-          clustered?: true
-      }
-
-      {:noreply, notify(:joined, state)}
-    else
-      {:noreply, state, {:continue, :quorum}}
+        {:noreply, notify(:joined, state)}
     end
   end
 
@@ -229,5 +205,58 @@ defmodule Cloister.Monitor do
   defp reschedule(state) do
     Process.send_after(self(), :update_node_list, @refresh_rate)
     state
+  end
+
+  #############################################################################
+
+  @spec net_kernel_magic(otp_app :: atom()) :: :ok
+  defp net_kernel_magic(otp_app) do
+    with :nonode@nohost <- node(),
+         service when is_atom(service) <- Application.get_env(:cloister, :sentry, []),
+         {:ok, s_ips} <- :inet_tcp.getaddrs(service),
+         {:ok, l_ips} <- :inet.getifaddrs() do
+      [ip | _] =
+        for {_, l_ip_info} <- l_ips,
+            l_ip_info_addr = l_ip_info[:addr],
+            ^l_ip_info_addr <- s_ips,
+            do: l_ip_info_addr |> Tuple.to_list() |> Enum.join(".")
+
+      :net_kernel.stop()
+      :net_kernel.start(['#{otp_app}@#{ip}', :longnames])
+    else
+      {:error, :nxdomain} ->
+        {:ok, host} = :inet.gethostname()
+        :net_kernel.stop()
+        :net_kernel.start(['#{otp_app}@#{host}', :longnames])
+
+      _ ->
+        :ok
+    end
+
+    :ok = :net_kernel.monitor_nodes(true, node_type: :all)
+  end
+
+  @spec active_sentry(otp_app :: atom()) :: [node()]
+  defp active_sentry(otp_app) do
+    case Application.get_env(:cloister, :sentry, [node()]) do
+      service when is_atom(service) ->
+        case :inet_tcp.getaddrs(service) do
+          {:ok, ip_list} ->
+            for {a, b, c, d} <- ip_list,
+                sentry = :"#{otp_app}@#{a}.#{b}.#{c}.#{d}",
+                Node.connect(sentry),
+                do: sentry
+
+          {:error, reason} ->
+            Logger.warn("[🕸️ #{inspect(service)}] #{node()} ❓: #{inspect(reason)}.")
+
+            []
+        end
+
+      [_ | _] = node_list ->
+        for sentry <- node_list,
+            Node.connect(sentry),
+            do: sentry
+    end
   end
 end

@@ -98,7 +98,7 @@ defmodule Cloister.MixProject do
       logo: "stuff/cloister-48x48.png",
       source_url: "https://github.com/am-kantox/#{@app}",
       assets: "stuff/images",
-      extras: ["README.md"],
+      extras: ["README.md", "stuff/configuration.md"],
       groups_for_modules: []
     ]
   end
