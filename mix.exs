@@ -2,7 +2,7 @@ defmodule Cloister.MixProject do
   use Mix.Project
 
   @app :cloister
-  @version "0.3.3"
+  @version "0.3.4"
 
   def project do
     [
@@ -98,7 +98,7 @@ defmodule Cloister.MixProject do
       logo: "stuff/cloister-48x48.png",
       source_url: "https://github.com/am-kantox/#{@app}",
       assets: "stuff/images",
-      extras: ["README.md"],
+      extras: ["README.md", "stuff/configuration.md"],
       groups_for_modules: []
     ]
   end
