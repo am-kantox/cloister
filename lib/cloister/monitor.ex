@@ -247,6 +247,10 @@ defmodule Cloister.Monitor do
                 Node.connect(sentry),
                 do: sentry
 
+          {:error, :nxdomain} ->
+            Logger.warn("[🕸️ #{node()}] Service not found: #{inspect(service)}.")
+            [node()]
+
           {:error, reason} ->
             Logger.warn("[🕸️ #{inspect(service)}] #{node()} ❓: #{inspect(reason)}.")
 
