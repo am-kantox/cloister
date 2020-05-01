@@ -212,8 +212,7 @@ defmodule Cloister.Monitor do
   @spec net_kernel_magic(otp_app :: atom()) :: :ok
   defp net_kernel_magic(otp_app) do
     maybe_host =
-      with :nonode@nohost <- node(),
-           service when is_atom(service) <- Application.get_env(:cloister, :sentry, []),
+      with service when is_atom(service) <- Application.get_env(:cloister, :sentry, []),
            {:ok, s_ips} <- :inet_tcp.getaddrs(service),
            {:ok, l_ips} <- :inet.getifaddrs() do
         [ip | _] =
