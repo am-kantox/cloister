@@ -211,21 +211,22 @@ defmodule Cloister.Monitor do
 
   @spec net_kernel_magic(otp_app :: atom()) :: :ok
   defp net_kernel_magic(otp_app) do
-    with :nonode@nohost <- node(),
-         service when is_atom(service) <- Application.get_env(:cloister, :sentry, []),
-         {:ok, s_ips} <- :inet_tcp.getaddrs(service),
-         {:ok, l_ips} <- :inet.getifaddrs() do
-      [ip | _] =
-        for {_, l_ip_info} <- l_ips,
-            l_ip_info_addr = l_ip_info[:addr],
-            ^l_ip_info_addr <- s_ips,
-            do: ip_addr_to_s(l_ip_info_addr)
+    maybe_host =
+      with :nonode@nohost <- node(),
+           service when is_atom(service) <- Application.get_env(:cloister, :sentry, []),
+           {:ok, s_ips} <- :inet_tcp.getaddrs(service),
+           {:ok, l_ips} <- :inet.getifaddrs() do
+        [ip | _] =
+          for {_, l_ip_info} <- l_ips,
+              l_ip_info_addr = l_ip_info[:addr],
+              ^l_ip_info_addr <- s_ips,
+              do: ip_addr_to_s(l_ip_info_addr)
 
-      :net_kernel.stop()
-      :net_kernel.start(['#{otp_app}@#{ip}', :longnames])
-    else
-      {:error, :nxdomain} ->
-        {:ok, host} =
+        Logger.debug("[🕸️ #{node()}] IP found: #{ip}")
+
+        {:ok, ip}
+      else
+        {:error, :nxdomain} ->
           case :inet.getifaddrs() do
             {:ok, ip_addrs} when is_list(ip_addrs) ->
               {:ok, point_to_point(ip_addrs) || broadcast(ip_addrs)}
@@ -234,11 +235,13 @@ defmodule Cloister.Monitor do
               :inet.gethostname()
           end
 
-        :net_kernel.stop()
-        :net_kernel.start(['#{otp_app}@#{host}', :longnames])
+        _ ->
+          :ok
+      end
 
-      _ ->
-        :ok
+    with {:ok, host} <- maybe_host do
+      Node.stop()
+      Node.start(:"#{otp_app}@#{host}")
     end
 
     :ok = :net_kernel.monitor_nodes(true, node_type: :all)
