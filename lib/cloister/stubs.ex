@@ -75,7 +75,7 @@ defmodule Cloister.Modules do
 
   @compile {:inline, info_module: 0, listener_module: 0}
 
-  @ring Application.get_env(:cloister, :ring, :cloister)
+  @ring Application.get_env(:cloister, :ring, Application.get_env(:cloister, :otp_app, :cloister))
 
   @info_module Application.get_env(:cloister, :monitor, Stubs.create_info_module(@ring))
   @spec info_module :: module()
