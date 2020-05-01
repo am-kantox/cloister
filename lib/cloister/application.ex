@@ -28,13 +28,24 @@ defmodule Cloister.Application do
   def start_phase(:warming_up, _start_type, phase_args) do
     phase_args
     |> Keyword.get(:consensus, Application.get_env(:cloister, :consensus, @consensus))
-    |> wait_consensus()
+    |> wait_consensus(0)
   end
 
   @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
-  defp wait_consensus(consensus, retries \\ 1) do
-    nodes = Cloister.Modules.info_module().nodes()
+  defp wait_consensus(consensus, retries) do
+    Process.sleep(@consensus_timeout)
+    do_wait_consensus(Cloister.Modules.info_module().nodes(), consensus, retries)
+  end
 
+  @spec do_wait_consensus(
+          [node()] | {:error, :no_such_ring},
+          consensus :: non_neg_integer(),
+          retries :: non_neg_integer()
+        ) :: :ok
+  defp do_wait_consensus({:error, :no_such_ring}, consensus, retries),
+    do: wait_consensus(consensus, retries)
+
+  defp do_wait_consensus(nodes, consensus, retries) when is_list(nodes) do
     nodes
     |> Enum.count()
     |> case do
@@ -46,7 +57,6 @@ defmodule Cloister.Application do
           _ -> Logger.debug(message)
         end
 
-        Process.sleep(@consensus_timeout)
         wait_consensus(consensus, retries + 1)
 
       _ ->

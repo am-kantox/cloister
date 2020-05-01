@@ -51,6 +51,8 @@ defmodule Cloister.Monitor do
     [{top_app, _, _} | _] = Application.loaded_applications()
     otp_app = Keyword.get(state, :otp_app, top_app)
 
+    net_kernel_magic(otp_app)
+
     unless Keyword.has_key?(state, :ring),
       do: HashRing.Managed.new(otp_app)
 
@@ -60,8 +62,6 @@ defmodule Cloister.Monitor do
       |> Keyword.put_new(:started_at, DateTime.utc_now())
       |> Keyword.put_new(:status, :starting)
       |> Keyword.put_new(:ring, otp_app)
-
-    net_kernel_magic(otp_app)
 
     {:ok, struct(__MODULE__, state), {:continue, :quorum}}
   end
@@ -167,7 +167,16 @@ defmodule Cloister.Monitor do
 
   @spec update_state(state :: t()) :: t()
   defp update_state(%Mon{} = state) do
-    ring = HashRing.Managed.nodes(state.ring)
+    state.ring
+    |> HashRing.Managed.nodes()
+    |> do_update_state(state)
+  end
+
+  @spec do_update_state([node()] | {:error, :no_such_ring}, state :: t()) :: t()
+  defp do_update_state({:error, :no_such_ring}, %Mon{} = state),
+    do: state
+
+  defp do_update_state(ring, %Mon{} = state) when is_list(ring) do
     nodes = [node() | Node.list()]
 
     status =
@@ -239,7 +248,12 @@ defmodule Cloister.Monitor do
       end
 
     with {:ok, host} <- maybe_host do
-      Node.stop()
+      stopped = Node.stop()
+
+      Logger.debug(
+        "[🕸️ #{node()}] stopped: [#{inspect(stopped)}], starting as: [#{otp_app}@#{host}]."
+      )
+
       Node.start(:"#{otp_app}@#{host}")
     end
 
