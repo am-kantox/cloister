@@ -219,13 +219,21 @@ defmodule Cloister.Monitor do
         for {_, l_ip_info} <- l_ips,
             l_ip_info_addr = l_ip_info[:addr],
             ^l_ip_info_addr <- s_ips,
-            do: l_ip_info_addr |> Tuple.to_list() |> Enum.join(".")
+            do: ip_addr_to_s(l_ip_info_addr)
 
       :net_kernel.stop()
       :net_kernel.start(['#{otp_app}@#{ip}', :longnames])
     else
       {:error, :nxdomain} ->
-        {:ok, host} = :inet.gethostname()
+        {:ok, host} =
+          case :inet.getifaddrs() do
+            {:ok, ip_addrs} when is_list(ip_addrs) ->
+              {:ok, point_to_point(ip_addrs) || broadcast(ip_addrs)}
+
+            _ ->
+              :inet.gethostname()
+          end
+
         :net_kernel.stop()
         :net_kernel.start(['#{otp_app}@#{host}', :longnames])
 
@@ -242,8 +250,8 @@ defmodule Cloister.Monitor do
       service when is_atom(service) ->
         case :inet_tcp.getaddrs(service) do
           {:ok, ip_list} ->
-            for {a, b, c, d} <- ip_list,
-                sentry = :"#{otp_app}@#{a}.#{b}.#{c}.#{d}",
+            for {_, _, _, _} = ip4_addr <- ip_list,
+                sentry = :"#{otp_app}@#{ip_addr_to_s(ip4_addr)}",
                 Node.connect(sentry),
                 do: sentry
 
@@ -253,7 +261,6 @@ defmodule Cloister.Monitor do
 
           {:error, reason} ->
             Logger.warn("[🕸️ #{inspect(service)}] #{node()} ❓: #{inspect(reason)}.")
-
             []
         end
 
@@ -261,6 +268,26 @@ defmodule Cloister.Monitor do
         for sentry <- node_list,
             Node.connect(sentry),
             do: sentry
+    end
+  end
+
+  @spec ip_addr_to_s(:inet.ip4_address()) :: binary()
+  defp ip_addr_to_s({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
+
+  @spec point_to_point([{binary(), :inet.getifaddrs_ifopts()}]) :: binary() | nil
+  defp point_to_point(addrs) do
+    case Enum.filter(addrs, fn {_, addr} -> :pointtopoint in addr[:flags] end) do
+      [] -> nil
+      [{_, addr}] -> ip_addr_to_s(addr[:addr])
+      _many -> with {:ok, host} <- :inet.gethostname(), do: host
+    end
+  end
+
+  @spec broadcast([{binary(), :inet.getifaddrs_ifopts()}]) :: binary()
+  defp broadcast(addrs) do
+    case Enum.filter(addrs, fn {_, addr} -> :broadcast in addr[:flags] end) do
+      [{_, addr}] -> ip_addr_to_s(addr[:addr])
+      _any -> with {:ok, host} <- :inet.gethostname(), do: host
     end
   end
 end
