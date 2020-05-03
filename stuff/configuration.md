@@ -25,6 +25,11 @@ config :cloister,
   # monitor to handle ring changes
   monitor: MyApp.Monitor,              # default: Stub
 
+  # monitor options to pass to a monitor when created
+  monitor_opts: [
+    name: MyMonitor                    # default: monitor.name
+  ]
+
   # additional modules to include into `Manager`’s supervision tree
   additional_modules: [Cloister.Void], # useful for tests / dev
 
@@ -37,8 +42,6 @@ config :cloister,
     name: Cloister.Manager,            # default
     state: [
       otp_app: :my_app,                # default: :cloister
-      listener: MyApp.Listener,        # default: Stub
-      monitor_opts: [],                # options for monitor
       additional_modules: []           # additional modules as above
     ]
   ]

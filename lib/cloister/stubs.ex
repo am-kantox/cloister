@@ -1,6 +1,8 @@
 defmodule Cloister.Modules do
   @moduledoc false
 
+  require Logger
+
   defmodule Stubs do
     use Boundary, deps: [], exports: []
 
@@ -33,6 +35,9 @@ defmodule Cloister.Modules do
               def nodes do
                 HashRing.Managed.nodes(unquote(ring))
               end
+
+              @spec ring :: atom()
+              def ring, do: unquote(ring)
             end
 
           Module.create(name, ast, Macro.Env.location(__ENV__))
@@ -74,6 +79,11 @@ defmodule Cloister.Modules do
   use Boundary, deps: [Stubs], exports: []
 
   @compile {:inline, info_module: 0, listener_module: 0}
+
+  Logger.debug(
+    "[🕸️ #{node()}] generating stubs as:\n" <>
+      inspect(Application.get_all_env(:cloister))
+  )
 
   @ring Application.get_env(:cloister, :ring, Application.get_env(:cloister, :otp_app, :cloister))
 
