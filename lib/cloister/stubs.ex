@@ -76,19 +76,21 @@ defmodule Cloister.Modules do
     end
   end
 
-  use Boundary, deps: [Stubs], exports: []
+  use Boundary, deps: [Cloister.Modules.Stubs], exports: []
 
   @compile {:inline, info_module: 0, listener_module: 0}
 
-  @env Application.get_all_env(:cloister)
+  @cloister_env Application.get_all_env(:cloister)
 
-  @ring Keyword.get(@env, :ring, Application.get_env(:cloister, :otp_app, :cloister))
+  @ring Keyword.get(@cloister_env, :ring, Application.get_env(:cloister, :otp_app, :cloister))
 
-  @info_module Keyword.get_lazy(@env, :monitor, fn -> Stubs.create_info_module(@ring) end)
+  @info_module Keyword.get_lazy(@cloister_env, :monitor, fn -> Stubs.create_info_module(@ring) end)
   @spec info_module :: module()
   def info_module, do: @info_module
 
-  @listener_module Keyword.get_lazy(@env, :listener, fn -> Stubs.create_listener_module(@ring) end)
+  @listener_module Keyword.get_lazy(@cloister_env, :listener, fn ->
+                     Stubs.create_listener_module(@ring)
+                   end)
   @spec listener_module :: module()
   def listener_module, do: @listener_module
 end

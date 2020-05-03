@@ -2,7 +2,7 @@ defmodule Cloister.Monitor do
   @moduledoc false
   use GenServer
 
-  use Boundary, deps: [], exports: []
+  use Boundary, deps: [Cloister.Modules], exports: []
 
   require Logger
 
