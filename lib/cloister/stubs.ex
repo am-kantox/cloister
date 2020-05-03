@@ -60,6 +60,7 @@ defmodule Cloister.Modules do
               @behaviour Cloister.Listener
               require Logger
 
+              @impl Cloister.Listener
               def on_state_change(from, state) do
                 Logger.debug(
                   "[🕸️ #{inspect(unquote(ring))} #{node()}] 🔄 from: #{from}, state: " <>

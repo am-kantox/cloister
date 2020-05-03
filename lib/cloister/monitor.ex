@@ -60,6 +60,7 @@ defmodule Cloister.Monitor do
       state
       |> Keyword.put_new(:otp_app, otp_app)
       |> Keyword.put_new(:started_at, DateTime.utc_now())
+      |> Keyword.put_new(:listener, Cloister.Modules.listener_module())
       |> Keyword.put_new(:status, :starting)
       |> Keyword.put_new(:ring, otp_app)
 
