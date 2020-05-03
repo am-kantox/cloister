@@ -10,7 +10,11 @@ defmodule Cloister.Application do
 
   @impl Application
   def start(_type, _args) do
-    Logger.debug("[🕸️ #{node()}] starting cloister with config:\n" <> inspect(Application.get_all_env(:cloister)))
+    Logger.debug(
+      "[🕸️ #{node()}] starting cloister with config:\n" <>
+        inspect(Application.get_all_env(:cloister))
+    )
+
     manager = Application.get_env(:cloister, :manager, [])
 
     children = [

@@ -31,10 +31,9 @@ defmodule Cloister.Modules do
                 end
               end
 
-              @spec nodes :: [term()]
-              def nodes do
-                HashRing.Managed.nodes(unquote(ring))
-              end
+              @spec nodes :: [term()] | {:error, :no_such_ring}
+              def nodes,
+                do: HashRing.Managed.nodes(unquote(ring))
 
               @spec ring :: atom()
               def ring, do: unquote(ring)

@@ -290,7 +290,8 @@ defmodule Cloister.Monitor do
   @spec ip_addr_to_s(:inet.ip4_address()) :: binary()
   defp ip_addr_to_s({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
 
-  @spec point_to_point([{binary(), :inet.getifaddrs_ifopts()}]) :: binary() | nil
+  # second type http://erlang.org/doc/man/inet.html#type-getifaddrs_ifopts
+  @spec point_to_point([{binary(), any()}]) :: binary() | nil
   defp point_to_point(addrs) do
     case Enum.filter(addrs, fn {_, addr} -> :pointtopoint in addr[:flags] end) do
       [] -> nil
@@ -299,7 +300,8 @@ defmodule Cloister.Monitor do
     end
   end
 
-  @spec broadcast([{binary(), :inet.getifaddrs_ifopts()}]) :: binary()
+  # second type http://erlang.org/doc/man/inet.html#type-getifaddrs_ifopts
+  @spec broadcast([{binary(), any()}]) :: binary()
   defp broadcast(addrs) do
     case Enum.filter(addrs, fn {_, addr} -> :broadcast in addr[:flags] end) do
       [{_, addr}] -> ip_addr_to_s(addr[:addr])
