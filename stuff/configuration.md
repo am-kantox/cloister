@@ -22,7 +22,7 @@ config :cloister,
   # listener to be called when the ring is changed
   listener: MyApp.Listener,            # default: Stub
 
-  # monitor to handle ring changes
+  # monitor to handle ring changes / don’t override
   monitor: MyApp.Monitor,              # default: Stub
 
   # monitor options to pass to a monitor when created

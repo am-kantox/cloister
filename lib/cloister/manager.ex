@@ -12,10 +12,7 @@ defmodule Cloister.Manager do
 
   @impl Supervisor
   def init(state) do
-    state =
-      state
-      |> Keyword.put_new(:otp_app, Application.get_env(:cloister, :otp_app, :cloister))
-      |> Keyword.put_new(:listener, Cloister.Modules.listener_module())
+    state = Keyword.put_new(state, :otp_app, Application.get_env(:cloister, :otp_app, :cloister))
 
     {monitor_opts, state} = Keyword.pop(state, :monitor_opts, [])
 

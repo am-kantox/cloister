@@ -206,7 +206,7 @@ defmodule Cloister.Monitor do
 
   defp notify(to, %{status: from} = state) do
     state = %Mon{state | status: to}
-    apply(state.listener, :on_state_change, [from, state])
+    Cloister.Modules.listener_module().on_state_change(from, state)
     reschedule(state)
   end
 
