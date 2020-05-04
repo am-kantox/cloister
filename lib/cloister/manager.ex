@@ -1,7 +1,16 @@
 defmodule Cloister.Manager do
-  @moduledoc false
+  @moduledoc """
+  Use this module to start _Cloister_ manually inside the application
+  supervision tree instead of running it as an application (default.)
+
+  This is not recommended and requires better understanding of internals.
+  Also, `:cloister` must be put into `:included_applications` section
+  of your application `mix.exs` to prevent the application from starting up
+  during the dependent applications starting phase.
+  """
   use Supervisor
 
+  @doc "Starts the cloister manager process in the supervision tree"
   @spec start_link(opts :: keyword()) :: GenServer.on_start()
   def start_link(opts) do
     :ok = Application.ensure_started(:libring, :permanent)
@@ -10,6 +19,7 @@ defmodule Cloister.Manager do
     Supervisor.start_link(__MODULE__, state, Keyword.put_new(opts, :name, __MODULE__))
   end
 
+  @doc false
   @impl Supervisor
   def init(state) do
     state = Keyword.put_new(state, :otp_app, Application.get_env(:cloister, :otp_app, :cloister))
@@ -35,6 +45,7 @@ defmodule Cloister.Manager do
     Supervisor.init(children, strategy: :rest_for_one)
   end
 
+  @spec ensure_compiled?(module()) :: boolean()
   defp ensure_compiled?(module),
     do: match?({:module, ^module}, Code.ensure_compiled(module))
 end

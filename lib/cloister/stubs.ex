@@ -4,9 +4,9 @@ defmodule Cloister.Modules do
   require Logger
 
   defmodule Stubs do
+    @moduledoc false
     use Boundary, deps: [], exports: []
 
-    @moduledoc false
     @doc false
     @spec create_info_module(ring :: term(), name :: module()) :: module()
     def create_info_module(ring, name \\ Cloister.Monitor.Info) do

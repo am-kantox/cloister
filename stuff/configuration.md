@@ -1,4 +1,4 @@
-# Cloister Configuration
+# Configuration
 
 _Cloister_ is another cluster support library that aims to be a drop-in for cluster support in distributed environment.
 

@@ -1,5 +1,7 @@
 defmodule Cloister.Node do
-  @moduledoc false
+  @moduledoc """
+  The abstraction level allowing milticalls and multicasts across the whole cluster.
+  """
 
   use GenServer
 
@@ -21,7 +23,9 @@ defmodule Cloister.Node do
   def init(state), do: {:ok, state}
 
   @spec multicast(name :: GenServer.name(), request :: term()) :: :abcast
-  @doc "Casts the request to all the nodes connected to this node"
+  @doc """
+  Casts the request to all the nodes connected to this node
+  """
   def multicast(name, request),
     do: GenServer.abcast(name, request)
 

@@ -1,13 +1,19 @@
 defmodule Cloister.Monitor do
-  @moduledoc false
+  @moduledoc """
+  The actual process that performs the monitoring of the cluster and invokes callbacks.
+
+  This process is started and supervised by `Cloister.Manager`.
+  """
   use GenServer
 
   use Boundary, deps: [Cloister.Modules], exports: []
 
   require Logger
 
+  @typedoc "Statuses the node running the code might be in regard to cloister"
   @type status :: :down | :starting | :joined | :up | :stopping | :rehashing | :panic
 
+  @typedoc "The monitor internal state"
   @type t :: %{
           __struct__: Cloister.Monitor,
           otp_app: atom(),
@@ -34,6 +40,7 @@ defmodule Cloister.Monitor do
   # millis
   @refresh_rate 300
 
+  @doc false
   @spec start_link(opts :: keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     {state, opts} = Keyword.pop(opts, :state, [])
@@ -68,6 +75,7 @@ defmodule Cloister.Monitor do
   end
 
   @impl GenServer
+  @doc false
   def terminate(reason, %Mon{} = state) do
     Logger.warn(
       "[🕸️ #{node()}] ⏹️ reason: [" <> inspect(reason) <> "], state: [" <> inspect(state) <> "]"
@@ -114,7 +122,7 @@ defmodule Cloister.Monitor do
   def state, do: GenServer.call(__MODULE__, :state)
 
   @spec siblings :: [node()]
-  @doc "Returns whether the requested amount of nodes in the cluster are connected"
+  @doc "Returns the nodes in the cluster that are connected to this one"
   def siblings, do: GenServer.call(__MODULE__, :siblings)
 
   @spec nodes! :: t()
@@ -124,12 +132,14 @@ defmodule Cloister.Monitor do
   ##############################################################################
 
   @impl GenServer
+  @doc false
   def handle_info(:update_node_list, state) do
     # Logger.debug("[🕸️ #{node()}] 🔄 state: [" <> inspect(state) <> "]")
     {:noreply, update_state(state)}
   end
 
   @impl GenServer
+  @doc false
   def handle_info({:nodeup, node, info}, state) do
     Logger.info(
       "[🕸️ #{node()}] #{node} ⬆️: [" <> inspect(info) <> "], state: [" <> inspect(state) <> "]"
@@ -139,6 +149,7 @@ defmodule Cloister.Monitor do
   end
 
   @impl GenServer
+  @doc false
   def handle_info({:nodedown, node, info}, state) do
     Logger.info(
       "[🕸️ #{node()}] #{node} ⬇️ info: [" <>

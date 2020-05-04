@@ -97,8 +97,8 @@ defmodule Cloister.MixProject do
       canonical: "http://hexdocs.pm/#{@app}",
       logo: "stuff/cloister-48x48.png",
       source_url: "https://github.com/am-kantox/#{@app}",
-      assets: "stuff/images",
-      extras: ["README.md", "stuff/configuration.md"],
+      assets: "stuff/img",
+      extras: ["README.md", "stuff/configuration.md", "stuff/docker-friendly.md"],
       groups_for_modules: []
     ]
   end
