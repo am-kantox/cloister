@@ -120,7 +120,7 @@ defmodule MyApp.WorkProcessor do
 
   @spec perform_work :: [any()]
   defp perform_work do
-    for record <- >:mnesia.select(...), do: ...
+    for record <- :mnesia.select(...), do: ...
   end
 end
 ```
