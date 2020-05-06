@@ -81,6 +81,7 @@ def on_state_change(_from, %Cloister.Monitor{status: :up}) do
           {^this, type} <- :mnesia.table_info(table, :where_to_commit),
           do: Enum.each(others, &:mnesia.add_table_copy(table, &1, type))
     end
+  end
 end
 ```
 
