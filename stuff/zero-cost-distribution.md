@@ -89,7 +89,7 @@ We are done! Now the topology change would enforce the renewal of `mnesia` confi
 
 OK, it’s now time to serve processors.
 
-## Using Tarearbol.DynamicManager to Delegate Work
+## DynamicManager Implementation
 
 As described in the documentation, [`Tarearbol.DynamicManager`](https://hexdocs.pm/tarearbol/dynamic_workers_management.html) expects a worker definition. Let’s provide it.
 
