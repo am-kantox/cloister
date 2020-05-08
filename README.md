@@ -1,6 +1,6 @@
 # Cloister
 
-**The helper application to manage cluster of nodes**
+![Test](https://github.com/am-kantox/cloister/workflows/Test/badge.svg)  ![Dialyzer](https://github.com/am-kantox/cloister/workflows/Dialyzer/badge.svg)    **The helper application to manage cluster of nodes**
 
 ## Installation
 
