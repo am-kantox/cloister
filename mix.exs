@@ -80,7 +80,7 @@ defmodule Cloister.MixProject do
   defp package do
     [
       name: @app,
-      files: ~w|config stuff lib mix.exs README.md|,
+      files: ~w|config stuff lib mix.exs README.md LICENSE|,
       maintainers: ["Aleksei Matiushkin"],
       licenses: ["MIT"],
       links: %{
