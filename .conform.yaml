@@ -2,23 +2,17 @@ policies:
   - type: commit
     spec:
       header:
-        length: 89
+        length: 50
         imperative: true
-        case: lower
+        case: upper
         invalidLastCharacters: .
       body:
-        required: true
-      dco: true
-      gpg: false
+        required: false
+      dco: false
+      gpg: true
       spellcheck:
         locale: US
-      maximumOfOneCommit: true
-      conventional:
-        types:
-          - "type"
-        scopes:
-          - "scope"
-        descriptionLength: 72
+      maximumOfOneCommit: false
   - type: license
     spec:
       skipPaths:
