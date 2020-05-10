@@ -82,7 +82,7 @@ defmodule Cloister.MixProject do
       name: @app,
       files: ~w|config stuff lib mix.exs README.md LICENSE|,
       maintainers: ["Aleksei Matiushkin"],
-      licenses: ["MIT"],
+      licenses: ["MIT", "Kantox LTD"],
       links: %{
         "GitHub" => "https://github.com/am-kantox/#{@app}",
         "Docs" => "https://hexdocs.pm/#{@app}"
