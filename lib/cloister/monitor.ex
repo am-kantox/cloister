@@ -40,7 +40,12 @@ defmodule Cloister.Monitor do
   # millis
   @refresh_rate 300
 
-  @doc false
+  @doc """
+  Used to start `Cloister.Monitor`.
+
+  Internally called by `Cloister.Manager.start_link/1`. In most cases
+    you don’t need to start `Monitor` process explicitly.
+  """
   @spec start_link(opts :: keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     {state, opts} = Keyword.pop(opts, :state, [])

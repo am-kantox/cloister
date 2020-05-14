@@ -1,6 +1,12 @@
 defmodule Cloister do
-  @moduledoc """
+  @moduledoc ~s"""
   `Cloister` is a consensus helper for clusters.
+
+  It is designed to be a configurable drop-in for transparent cluster support.
+
+  ### Supported options
+
+  #{NimbleOptions.docs(Cloister.Options.schema())}
   """
 
   use Boundary, deps: [Cloister.{Modules, Monitor, Node}], exports: []

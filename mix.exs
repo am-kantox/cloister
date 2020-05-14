@@ -47,6 +47,7 @@ defmodule Cloister.MixProject do
     [
       {:libring, "~> 1.0"},
       {:boundary, "~> 0.4", runtime: false},
+      {:nimble_options, "~> 0.2"},
       # dev / test
       {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci]},
       {:dialyxir, "~> 1.0.0", only: [:dev, :test, :ci]},

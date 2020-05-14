@@ -27,7 +27,7 @@ config :cloister,
 
 ## Changelog
 
-- **`0.2.0`** use `Application.start_phases/3` callback to postpone application start until the consensus is reached
+- **`0.2.0`** use `Application.c:start_phase/3` callback to postpone application start until the consensus is reached
 
 
 ---
