@@ -145,7 +145,7 @@ defmodule Cloister.Monitor do
 
   @spec update_groups(args :: keyword()) :: t()
   @doc false
-  def update_groups(args), do: GenServer.call(__MODULE__, {:update_groups, args})
+  def update_groups(args), do: GenServer.call(__MODULE__, {:update_groups, args}, 60_000)
 
   ##############################################################################
 
