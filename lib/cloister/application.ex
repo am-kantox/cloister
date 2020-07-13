@@ -31,28 +31,23 @@ defmodule Cloister.Application do
 
   @impl Application
   def start_phase(:warming_up, _start_type, phase_args) do
-    state =
-      phase_args
-      |> Keyword.get(:consensus, Application.get_env(:cloister, :consensus, @consensus))
-      |> wait_consensus(0)
+    phase_args
+    |> Keyword.get(:consensus, Application.get_env(:cloister, :consensus, @consensus))
+    |> wait_consensus(0)
 
-    Logger.info(
-      "Cloister → Phase I. Warming up, waiting for consensus. State:\n" <> inspect(state)
-    )
+    Logger.info("[🕸️ :#{node()}] Cloister → Phase I. Warming up, waiting for consensus.")
   end
 
   @impl Application
   def start_phase(:rehash_on_up, _start_type, phase_args) do
     state = Cloister.Monitor.update_groups(phase_args)
-    Logger.info("Cloister → Phase II. Updating groups. State:\n" <> inspect(state))
+    Logger.info("[🕸️ :#{node()}] Cloister → Phase II. Updating groups. State:\n" <> inspect(state))
   end
 
-  @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) ::
-          Clositer.Monitor.t()
+  @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
   defp wait_consensus(consensus, retries) do
     Process.sleep(@consensus_timeout)
     do_wait_consensus(Cloister.Modules.info_module().nodes(), consensus, retries)
-    Cloister.state()
   end
 
   @spec do_wait_consensus(
@@ -78,7 +73,7 @@ defmodule Cloister.Application do
         wait_consensus(consensus, retries + 1)
 
       _ ->
-        Logger.info("[🕸️ :#{node()}] ⌛ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]")
+        Logger.info("[🕸️ :#{node()}] ⌚ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]")
     end
   end
 end

@@ -364,7 +364,7 @@ defmodule Cloister.Monitor do
 
   @spec register_node(node :: node(), state :: t()) :: t()
   defp register_node(node, %Mon{otp_app: otp_app, ring: ring, status: status} = state)
-       when status in [:rehashing, :up] do
+       when status in [:up] do
     if node == node() do
       Logger.debug("[🕸️ :#{node()}] ⏹️  self [#{node}] has been registered")
       HashRing.Managed.add_node(ring, node)
