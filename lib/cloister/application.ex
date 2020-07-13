@@ -40,8 +40,8 @@ defmodule Cloister.Application do
 
   @impl Application
   def start_phase(:rehash_on_up, _start_type, phase_args) do
-    state = Cloister.Monitor.update_groups(phase_args)
-    Logger.info("[🕸️ :#{node()}] Cloister → Phase II. Updating groups. State:\n" <> inspect(state))
+    Cloister.Monitor.update_groups(phase_args)
+    Logger.info("[🕸️ :#{node()}] Cloister → Phase II. Updating groups.")
   end
 
   @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok

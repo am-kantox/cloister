@@ -46,7 +46,7 @@ defmodule Cloister.Monitor do
   @refresh_rate 300
 
   # millis
-  @rpc_timeout 3_000
+  @rpc_timeout 5_000
 
   @doc """
   Used to start `Cloister.Monitor`.
@@ -143,9 +143,9 @@ defmodule Cloister.Monitor do
   @doc "Rehashes the ring and returns the current state"
   def nodes!, do: GenServer.call(__MODULE__, :nodes!)
 
-  @spec update_groups(args :: keyword()) :: t()
+  @spec update_groups(args :: keyword()) :: :ok
   @doc false
-  def update_groups(args), do: GenServer.call(__MODULE__, {:update_groups, args}, 60_000)
+  def update_groups(args), do: GenServer.cast(__MODULE__, {:update_groups, args})
 
   ##############################################################################
 
@@ -197,10 +197,10 @@ defmodule Cloister.Monitor do
 
   @impl GenServer
   @doc false
-  def handle_call({:update_groups, _args}, _from, %Mon{} = state) do
+  def handle_cast({:update_groups, _args}, %Mon{} = state) do
     state = %Mon{state | groups: [{state.otp_app, [node()]}]}
     state = Enum.reduce(Node.list(), state, &register_node/2)
-    {:reply, state, state}
+    {:noreply, state}
   end
 
   ##############################################################################
@@ -363,8 +363,7 @@ defmodule Cloister.Monitor do
   defp update_group(_, _, _, state), do: state
 
   @spec register_node(node :: node(), state :: t()) :: t()
-  defp register_node(node, %Mon{otp_app: otp_app, ring: ring, status: status} = state)
-       when status in [:up] do
+  defp register_node(node, %Mon{otp_app: otp_app, ring: ring, status: :up} = state) do
     if node == node() do
       Logger.debug("[🕸️ :#{node()}] ⏹️  self [#{node}] has been registered")
       HashRing.Managed.add_node(ring, node)
