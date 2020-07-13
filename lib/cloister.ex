@@ -35,9 +35,9 @@ defmodule Cloister do
   @doc "Returns `true` if the hashring points to this node for the term given, `false` otherwise"
   def mine?(term), do: whois(term) == node()
 
-  @spec otp_app :: atom()
-  @doc "Returns an `otp_app` from current node cloister monitor state"
-  def otp_app, do: state().otp_app
+  @spec ring :: atom()
+  @doc "Returns the `ring` from current node cloister monitor state"
+  def ring, do: Cloister.Modules.info_module().ring()
 
   defdelegate state, to: Cloister.Monitor
   defdelegate siblings, to: Cloister.Monitor

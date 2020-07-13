@@ -369,7 +369,7 @@ defmodule Cloister.Monitor do
       HashRing.Managed.add_node(ring, node)
       update_group(:add, otp_app, node, state)
     else
-      case :rpc.call(node, Cloister, :otp_app, [], @rpc_timeout) do
+      case :rpc.call(node, Cloister, :ring, [], @rpc_timeout) do
         {:badrpc, reason} ->
           Logger.warn(
             "[🕸️ :#{node()}] ⏹️  attempt to call node [#{node}] failed with [#{inspect(reason)}]"
