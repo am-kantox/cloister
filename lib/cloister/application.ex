@@ -11,7 +11,7 @@ defmodule Cloister.Application do
   @impl Application
   def start(_type, _args) do
     Logger.debug(
-      "[🕸️ #{node()}] starting cloister with config:\n" <>
+      "[🕸️ :#{node()}] starting cloister with config:\n" <>
         inspect(Application.get_all_env(:cloister))
     )
 
@@ -31,15 +31,28 @@ defmodule Cloister.Application do
 
   @impl Application
   def start_phase(:warming_up, _start_type, phase_args) do
-    phase_args
-    |> Keyword.get(:consensus, Application.get_env(:cloister, :consensus, @consensus))
-    |> wait_consensus(0)
+    state =
+      phase_args
+      |> Keyword.get(:consensus, Application.get_env(:cloister, :consensus, @consensus))
+      |> wait_consensus(0)
+
+    Logger.info(
+      "Cloister → Phase I. Warming up, waiting for consensus. State:\n" <> inspect(state)
+    )
   end
 
-  @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
+  @impl Application
+  def start_phase(:rehash_on_up, _start_type, phase_args) do
+    state = Cloister.Monitor.update_groups(phase_args)
+    Logger.info("Cloister → Phase II. Updating groups. State:\n" <> inspect(state))
+  end
+
+  @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) ::
+          Clositer.Monitor.t()
   defp wait_consensus(consensus, retries) do
     Process.sleep(@consensus_timeout)
     do_wait_consensus(Cloister.Modules.info_module().nodes(), consensus, retries)
+    Cloister.state()
   end
 
   @spec do_wait_consensus(
@@ -55,7 +68,7 @@ defmodule Cloister.Application do
     |> Enum.count()
     |> case do
       n when n < consensus ->
-        message = "[🕸️ #{node()}] ⏳ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]"
+        message = "[🕸️ :#{node()}] ⏳ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]"
 
         case div(retries, 10) do
           0 -> Logger.warn(message)
@@ -65,7 +78,7 @@ defmodule Cloister.Application do
         wait_consensus(consensus, retries + 1)
 
       _ ->
-        Logger.info("[🕸️ #{node()}] ⌛ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]")
+        Logger.info("[🕸️ :#{node()}] ⌛ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]")
     end
   end
 end

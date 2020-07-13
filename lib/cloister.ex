@@ -25,9 +25,11 @@ defmodule Cloister do
   def init(opts),
     do: DynamicSupervisor.init(Keyword.merge([strategy: :one_for_one], opts))
 
-  @spec whois(term :: any()) :: node() | {:error, :no_such_ring}
-  @doc "Returns who would be chosen by a hash ring for the term"
-  def whois(term), do: Cloister.Modules.info_module().whois(term)
+  @spec whois(group :: atom(), term :: any()) ::
+          node() | {:error, {:invalid_ring, :no_nodes}} | {:error, {:not_our_ring, atom()}}
+  @doc "Returns who would be chosen by a hash ring for the term in the group given"
+  def whois(group \\ nil, term),
+    do: with({:ok, node} <- Cloister.Modules.info_module().whois(group, term), do: node)
 
   @spec mine?(term :: any()) :: boolean() | {:error, :no_such_ring}
   @doc "Returns `true` if the hashring points to this node for the term given, `false` otherwise"
