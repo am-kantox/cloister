@@ -390,7 +390,10 @@ defmodule Cloister.Monitor do
     end
   end
 
-  defp register_node(_node, %Mon{} = state), do: state
+  defp register_node(node, %Mon{ring: ring} = state) do
+    HashRing.Managed.add_node(ring, node)
+    state
+  end
 
   @spec unregister_node(node :: node(), state :: t()) :: t()
   defp unregister_node(node, %Mon{groups: groups, ring: ring} = state) do
