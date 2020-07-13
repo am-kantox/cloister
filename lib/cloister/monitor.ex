@@ -13,10 +13,14 @@ defmodule Cloister.Monitor do
   @typedoc "Statuses the node running the code might be in regard to cloister"
   @type status :: :down | :starting | :joined | :up | :stopping | :rehashing | :panic
 
+  @typedoc "Group of nodes sharing the same hashring"
+  @type group :: {atom(), [node()]}
+
   @typedoc "The monitor internal state"
   @type t :: %{
           __struct__: Cloister.Monitor,
           otp_app: atom(),
+          groups: [group()],
           listener: module(),
           started_at: DateTime.t(),
           status: status(),
@@ -27,6 +31,7 @@ defmodule Cloister.Monitor do
         }
 
   defstruct otp_app: :cloister,
+            groups: [],
             listener: nil,
             started_at: nil,
             status: :down,
@@ -39,6 +44,9 @@ defmodule Cloister.Monitor do
 
   # millis
   @refresh_rate 300
+
+  # millis
+  @rpc_timeout 3_000
 
   @doc """
   Used to start `Cloister.Monitor`.
@@ -83,7 +91,7 @@ defmodule Cloister.Monitor do
   @doc false
   def terminate(reason, %Mon{} = state) do
     Logger.warn(
-      "[🕸️ #{node()}] ⏹️ reason: [" <> inspect(reason) <> "], state: [" <> inspect(state) <> "]"
+      "[🕸️ :#{node()}] ⏹️  reason: [" <> inspect(reason) <> "], state: [" <> inspect(state) <> "]"
     )
 
     state = notify(:stopping, state)
@@ -112,6 +120,7 @@ defmodule Cloister.Monitor do
             clustered?: true
         }
 
+        state = update_group(:add, otp_app, node(), state)
         {:noreply, notify(:joined, state)}
     end
   end
@@ -127,19 +136,23 @@ defmodule Cloister.Monitor do
   def state, do: GenServer.call(__MODULE__, :state)
 
   @spec siblings :: [node()]
-  @doc "Returns the nodes in the cluster that are connected to this one"
+  @doc "Returns the nodes in the cluster that are connected to this one in the same group"
   def siblings, do: GenServer.call(__MODULE__, :siblings)
 
   @spec nodes! :: t()
   @doc "Rehashes the ring and returns the current state"
   def nodes!, do: GenServer.call(__MODULE__, :nodes!)
 
+  @spec update_groups(args :: keyword()) :: t()
+  @doc false
+  def update_groups(args), do: GenServer.call(__MODULE__, {:update_groups, args})
+
   ##############################################################################
 
   @impl GenServer
   @doc false
   def handle_info(:update_node_list, state) do
-    # Logger.debug("[🕸️ #{node()}] 🔄 state: [" <> inspect(state) <> "]")
+    # Logger.debug("[🕸️ :#{node()}] 🔄 state: [" <> inspect(state) <> "]")
     {:noreply, update_state(state)}
   end
 
@@ -147,7 +160,7 @@ defmodule Cloister.Monitor do
   @doc false
   def handle_info({:nodeup, node, info}, state) do
     Logger.info(
-      "[🕸️ #{node()}] #{node} ⬆️: [" <> inspect(info) <> "], state: [" <> inspect(state) <> "]"
+      "[🕸️ :#{node()}] #{node} ⬆️: [" <> inspect(info) <> "], state: [" <> inspect(state) <> "]"
     )
 
     {:noreply, update_state(state)}
@@ -157,7 +170,7 @@ defmodule Cloister.Monitor do
   @doc false
   def handle_info({:nodedown, node, info}, state) do
     Logger.info(
-      "[🕸️ #{node()}] #{node} ⬇️ info: [" <>
+      "[🕸️ :#{node()}] #{node} ⬇️ info: [" <>
         inspect(info) <> "], state: [" <> inspect(state) <> "]"
     )
 
@@ -172,8 +185,8 @@ defmodule Cloister.Monitor do
 
   @impl GenServer
   @doc false
-  def handle_call(:siblings, _from, state),
-    do: {:reply, [node() | Node.list()], state}
+  def handle_call(:siblings, _from, %Mon{otp_app: otp_app, groups: groups} = state),
+    do: {:reply, groups[otp_app], state}
 
   @impl GenServer
   @doc false
@@ -181,6 +194,16 @@ defmodule Cloister.Monitor do
     state = update_state(state)
     {:reply, state, state}
   end
+
+  @impl GenServer
+  @doc false
+  def handle_call({:update_groups, _args}, _from, %Mon{} = state) do
+    state = %Mon{state | groups: [{state.otp_app, [node()]}]}
+    state = Enum.reduce(Node.list(), state, &register_node/2)
+    {:reply, state, state}
+  end
+
+  ##############################################################################
 
   @spec update_state(state :: t()) :: t()
   defp update_state(%Mon{} = state) do
@@ -202,16 +225,16 @@ defmodule Cloister.Monitor do
           :up
 
         {[], to_ring} ->
-          Enum.each(to_ring, &HashRing.Managed.add_node(state.ring, &1))
+          Enum.each(to_ring, &register_node(&1, state))
           :rehashing
 
         {from_ring, []} ->
-          Enum.each(from_ring, &HashRing.Managed.remove_node(state.ring, &1))
+          Enum.each(from_ring, &unregister_node(&1, state))
           :rehashing
 
         {from_ring, to_ring} ->
-          Enum.each(from_ring, &HashRing.Managed.remove_node(state.ring, &1))
-          Enum.each(to_ring, &HashRing.Managed.add_node(state.ring, &1))
+          Enum.each(from_ring, &unregister_node(&1, state))
+          Enum.each(to_ring, &register_node(&1, state))
           :panic
       end
 
@@ -247,7 +270,7 @@ defmodule Cloister.Monitor do
               ^l_ip_info_addr <- s_ips,
               do: ip_addr_to_s(l_ip_info_addr)
 
-        Logger.debug("[🕸️ #{node()}] IP found: #{ip}")
+        Logger.debug("[🕸️ :#{node()}] IP found: #{ip}")
 
         {:ok, ip}
       else
@@ -268,7 +291,7 @@ defmodule Cloister.Monitor do
       stopped = Node.stop()
 
       Logger.debug(
-        "[🕸️ #{node()}] stopped: [#{inspect(stopped)}], starting as: [#{otp_app}@#{host}]."
+        "[🕸️ :#{node()}] stopped: [#{inspect(stopped)}], starting as: [#{otp_app}@#{host}]."
       )
 
       Node.start(:"#{otp_app}@#{host}")
@@ -289,11 +312,11 @@ defmodule Cloister.Monitor do
                 do: sentry
 
           {:error, :nxdomain} ->
-            Logger.warn("[🕸️ #{node()}] Service not found: #{inspect(service)}.")
+            Logger.warn("[🕸️ :#{node()}] Service not found: #{inspect(service)}.")
             [node()]
 
           {:error, reason} ->
-            Logger.warn("[🕸️ #{inspect(service)}] #{node()} ❓: #{inspect(reason)}.")
+            Logger.warn("[🕸️ #{inspect(service)}] :#{node()} ❓: #{inspect(reason)}.")
             []
         end
 
@@ -324,5 +347,60 @@ defmodule Cloister.Monitor do
       [{_, addr}] -> ip_addr_to_s(addr[:addr])
       _any -> with {:ok, host} <- :inet.gethostname(), do: host
     end
+  end
+
+  @spec update_group(:add | :remove, group :: atom(), who :: node(), state :: t()) :: t()
+  defp update_group(:add, group, who, %Mon{groups: groups, status: :up} = state) do
+    groups = Keyword.update(groups, group, [who], &Enum.uniq([who | &1]))
+    %Mon{state | groups: groups}
+  end
+
+  defp update_group(:remove, group, who, %Mon{groups: groups, status: :up} = state) do
+    groups = Keyword.update!(groups, group, &List.delete(&1, who))
+    %Mon{state | groups: groups}
+  end
+
+  defp update_group(_, _, _, state), do: state
+
+  @spec register_node(node :: node(), state :: t()) :: t()
+  defp register_node(node, %Mon{otp_app: otp_app, ring: ring, status: status} = state)
+       when status in [:rehashing, :up] do
+    if node == node() do
+      Logger.debug("[🕸️ :#{node()}] ⏹️  self [#{node}] has been registered")
+      HashRing.Managed.add_node(ring, node)
+      update_group(:add, otp_app, node, state)
+    else
+      case :rpc.call(node, Cloister, :otp_app, [], @rpc_timeout) do
+        {:badrpc, reason} ->
+          Logger.warn(
+            "[🕸️ :#{node()}] ⏹️  attempt to call node [#{node}] failed with [#{inspect(reason)}]"
+          )
+
+          state
+
+        ^otp_app ->
+          Logger.debug("[🕸️ :#{node()}] ⏹️  sibling node [#{node}] has been registered")
+          HashRing.Managed.add_node(ring, node)
+          update_group(:add, otp_app, node, state)
+
+        name ->
+          Logger.debug("[🕸️ :#{node()}] ⏹️  cousin node [#{node}] has been registered")
+          update_group(:add, name, node, state)
+      end
+    end
+  end
+
+  defp register_node(_node, %Mon{} = state), do: state
+
+  @spec unregister_node(node :: node(), state :: t()) :: t()
+  defp unregister_node(node, %Mon{groups: groups, ring: ring} = state) do
+    Enum.reduce_while(groups, state, fn {group, nodes}, state ->
+      if Enum.member?(nodes, node) do
+        HashRing.Managed.remove_node(ring, node)
+        {:halt, update_group(:remove, group, node, state)}
+      else
+        {:cont, state}
+      end
+    end)
   end
 end

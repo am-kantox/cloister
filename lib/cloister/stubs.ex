@@ -19,17 +19,27 @@ defmodule Cloister.Modules do
             quote do
               @moduledoc false
 
-              @spec whois(term :: term()) :: node()
-              def whois(term) do
-                case HashRing.Managed.key_to_node(unquote(ring), term) do
-                  {:error, {:invalid_ring, :no_nodes}} ->
-                    Cloister.Monitor.nodes!()
-                    whois(term)
+              @spec whois(group :: atom(), term :: term(), retry? :: boolean()) ::
+                      {:ok, node()} | {:error, {:not_our_ring, atom()}}
+              def whois(group \\ nil, term, retry? \\ true)
 
-                  node ->
-                    node
+              def whois(nil, term, retry?), do: whois(unquote(ring), term, retry?)
+
+              def whois(unquote(ring), term, retry?) do
+                case {retry?, HashRing.Managed.key_to_node(unquote(ring), term)} do
+                  {false, {:error, {:invalid_ring, :no_nodes}} = error} ->
+                    error
+
+                  {true, {:error, {:invalid_ring, :no_nodes}}} ->
+                    Cloister.Monitor.nodes!()
+                    whois(unquote(ring), term, false)
+
+                  {_, node} ->
+                    {:ok, node}
                 end
               end
+
+              def whois(ring, _, _), do: {:error, {:not_out_ring, ring}}
 
               @spec nodes :: [term()] | {:error, :no_such_ring}
               def nodes,
@@ -63,7 +73,7 @@ defmodule Cloister.Modules do
               @impl Cloister.Listener
               def on_state_change(from, state) do
                 Logger.debug(
-                  "[🕸️ #{inspect(unquote(ring))} #{node()}] 🔄 from: #{from}, state: " <>
+                  "[🕸️ #{inspect(unquote(ring))} :#{node()}] 🔄 from: :#{from}, state: " <>
                     inspect(state)
                 )
               end

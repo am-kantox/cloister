@@ -39,9 +39,9 @@ defmodule Cloister.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      applications: [:logger, :libring],
+      extra_applications: [:logger, :libring],
       mod: {Cloister.Application, []},
-      start_phases: [{:warming_up, []}],
+      start_phases: [warming_up: [], rehash_on_up: []],
       registered: [Cloister, Cloister.Node, Cloister.Manager]
     ]
   end
@@ -53,7 +53,7 @@ defmodule Cloister.MixProject do
       {:nimble_options, "~> 0.2"},
       # dev / test
       {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci]},
-      {:dialyxir, "~> 1.0.0", only: [:dev, :test, :ci]},
+      {:dialyxir, "~> 1.0.0", only: [:dev, :test, :ci], runtime: false},
       {:credo, "~> 1.0", only: [:dev, :ci], runtime: false},
       {:ex_doc, "~> 0.11", only: :dev, runtime: false}
     ]

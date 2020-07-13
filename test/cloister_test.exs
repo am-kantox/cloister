@@ -31,4 +31,8 @@ defmodule CloisterTest do
     assert_receive({:"$gen_cast", {:pong, _}}, @delay)
     assert {:message_queue_len, 0} = :erlang.process_info(self(), :message_queue_len)
   end
+
+  test "groups" do
+    IO.inspect(Cloister.state().groups, label: "Groups")
+  end
 end

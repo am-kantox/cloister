@@ -22,7 +22,8 @@ defmodule Cloister.Options do
   def additional_modules(value) do
     case value do
       [_ | _] = modules ->
-        if Enum.all?(modules, &match?({:module, ^&1}, Code.ensure_compiled(&1))),
+        # if Enum.all?(modules, &match?({:module, ^&1}, Code.ensure_compiled(&1))),
+        if Enum.all?(modules, &is_atom/1),
           do: {:ok, value},
           else: {:error, "All modules specified as additional must be available"}
 
@@ -71,7 +72,7 @@ defmodule Cloister.Options do
       doc: "Set of options to configure `Cloister.Manager` when started in a supervision tree.",
       type: :non_empty_keyword_list,
       keys: [
-        name: [required: true, type: :atom, doc: "Name of the `Manager` process."],
+        name: [type: :atom, doc: "Name of the `Manager` process."],
         state: [
           type: :non_empty_keyword_list,
           keys: [
