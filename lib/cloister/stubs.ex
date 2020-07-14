@@ -39,7 +39,7 @@ defmodule Cloister.Modules do
                 end
               end
 
-              def whois(ring, _, _), do: {:error, {:not_out_ring, ring}}
+              def whois(ring, _, _), do: {:error, {:not_our_ring, ring}}
 
               @spec nodes :: [term()] | {:error, :no_such_ring}
               def nodes,

@@ -51,11 +51,11 @@ defmodule Cloister.Application do
   end
 
   @spec do_wait_consensus(
-          [node()] | {:error, :no_such_ring},
+          [node() | {:error, :no_such_ring}],
           consensus :: non_neg_integer(),
           retries :: non_neg_integer()
         ) :: :ok
-  defp do_wait_consensus({:error, :no_such_ring}, consensus, retries),
+  defp do_wait_consensus([{:error, :no_such_ring} | _], consensus, retries),
     do: wait_consensus(consensus, retries)
 
   defp do_wait_consensus(nodes, consensus, retries) when is_list(nodes) do

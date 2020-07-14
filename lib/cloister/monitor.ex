@@ -212,8 +212,8 @@ defmodule Cloister.Monitor do
     |> do_update_state(state)
   end
 
-  @spec do_update_state([node()] | {:error, :no_such_ring}, state :: t()) :: t()
-  defp do_update_state({:error, :no_such_ring}, %Mon{} = state),
+  @spec do_update_state([node() | {:error, :no_such_ring}], state :: t()) :: t()
+  defp do_update_state([{:error, :no_such_ring} | _], %Mon{} = state),
     do: state
 
   defp do_update_state(ring, %Mon{} = state) when is_list(ring) do

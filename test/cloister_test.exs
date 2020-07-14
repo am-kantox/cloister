@@ -2,6 +2,8 @@ defmodule CloisterTest do
   use ExUnit.Case
   doctest Cloister
 
+  require Logger
+
   @delay if Mix.env() == :ci, do: 5_000, else: 5_000
 
   test "multicasts" do
@@ -33,6 +35,6 @@ defmodule CloisterTest do
   end
 
   test "groups" do
-    IO.inspect(Cloister.state().groups, label: "Groups")
+    Logger.warn("Groups: " <> inspect(Cloister.state().groups))
   end
 end
