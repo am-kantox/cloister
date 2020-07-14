@@ -8,6 +8,8 @@ defmodule Cloister.Monitor do
 
   use Boundary, deps: [Cloister.Modules], exports: []
 
+  alias HashRing.Managed, as: Ring
+
   require Logger
 
   @typedoc "Statuses the node running the code might be in regard to cloister"
@@ -74,7 +76,7 @@ defmodule Cloister.Monitor do
     net_kernel_magic(otp_app)
 
     unless Keyword.has_key?(state, :ring),
-      do: HashRing.Managed.new(otp_app)
+      do: Ring.new(otp_app)
 
     state =
       state
@@ -198,8 +200,10 @@ defmodule Cloister.Monitor do
   @impl GenServer
   @doc false
   def handle_cast({:update_groups, _args}, %Mon{} = state) do
-    state = %Mon{state | groups: [{state.otp_app, [node()]}]}
-    state = Enum.reduce(Node.list(), state, &register_node/2)
+    Enum.each(Ring.nodes(state.ring), &Ring.remove_node(state.ring, &1))
+
+    state = %Mon{state | groups: []}
+    state = Enum.reduce([node() | Node.list()], state, &register_node/2)
     {:noreply, state}
   end
 
@@ -208,7 +212,7 @@ defmodule Cloister.Monitor do
   @spec update_state(state :: t()) :: t()
   defp update_state(%Mon{} = state) do
     state.ring
-    |> HashRing.Managed.nodes()
+    |> Ring.nodes()
     |> do_update_state(state)
   end
 
@@ -366,7 +370,7 @@ defmodule Cloister.Monitor do
   defp register_node(node, %Mon{otp_app: otp_app, ring: ring, status: :up} = state) do
     if node == node() do
       Logger.debug("[🕸️ :#{node()}] ⏹️  self [#{node}] has been registered")
-      HashRing.Managed.add_node(ring, node)
+      Ring.add_node(ring, node)
       update_group(:add, otp_app, node, state)
     else
       case :rpc.call(node, Cloister, :ring, [], @rpc_timeout) do
@@ -379,7 +383,7 @@ defmodule Cloister.Monitor do
 
         ^otp_app ->
           Logger.debug("[🕸️ :#{node()}] ⏹️  sibling node [#{node}] has been registered")
-          HashRing.Managed.add_node(ring, node)
+          Ring.add_node(ring, node)
           update_group(:add, otp_app, node, state)
 
         name ->
@@ -389,16 +393,19 @@ defmodule Cloister.Monitor do
     end
   end
 
-  defp register_node(node, %Mon{ring: ring} = state) do
-    HashRing.Managed.add_node(ring, node)
+  # this (empty groups) happens only during Phase I
+  defp register_node(node, %Mon{ring: ring, groups: []} = state) do
+    Ring.add_node(ring, node)
     state
   end
+
+  defp register_node(_node, %Mon{} = state), do: state
 
   @spec unregister_node(node :: node(), state :: t()) :: t()
   defp unregister_node(node, %Mon{groups: groups, ring: ring} = state) do
     Enum.reduce_while(groups, state, fn {group, nodes}, state ->
       if Enum.member?(nodes, node) do
-        HashRing.Managed.remove_node(ring, node)
+        Ring.remove_node(ring, node)
         {:halt, update_group(:remove, group, node, state)}
       else
         {:cont, state}
