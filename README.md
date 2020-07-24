@@ -1,10 +1,10 @@
-# Cloister
+# Cloister    [![Kantox ❤ OSS](https://img.shields.io/badge/❤-kantox_oss-informational.svg)](https://kantox.com/)  ![Test](https://github.com/am-kantox/cloister/workflows/Test/badge.svg)  ![Dialyzer](https://github.com/am-kantox/cloister/workflows/Dialyzer/badge.svg)
 
-![Test](https://github.com/am-kantox/cloister/workflows/Test/badge.svg)  ![Dialyzer](https://github.com/am-kantox/cloister/workflows/Dialyzer/badge.svg)    **The helper application to manage cluster of nodes**
+**The helper application to manage cluster of nodes.**
 
 ## Installation
 
-* Add the dependency to your `mix.exs` file:
+- Add the dependency to your `mix.exs` file:
 
 ```elixir
 def deps do
@@ -15,7 +15,7 @@ def deps do
 end
 ```
 
-* Make sure both `:cloister` and `:libring` applications are configured properly in your `config.exs`
+- Make sure both `:cloister` and `:libring` applications are configured properly in your `config.exs`
 
 ```elixir
 config :cloister,
@@ -23,15 +23,13 @@ config :cloister,
   consensus: 2
 ```
 
-* Make sure `:cloister` application is started. This does not require any action unless you have the list of applications specified explicitly. If so, add `:cloister` there.
+- Make sure `:cloister` application is started. This does not require any action unless you have the list of applications specified explicitly. If so, add `:cloister` there.
 
 ## Changelog
 
 - **`0.6.0`** support many hashrings within the same cloister
 - **`0.2.0`** use `Application.c:start_phase/3` callback to postpone application start until the consensus is reached
 
-
 ---
 
 ## [Documentation](https://hexdocs.pm/cloister).
-
