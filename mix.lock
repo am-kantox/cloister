@@ -1,5 +1,5 @@
 %{
-  "boundary": {:hex, :boundary, "0.4.4", "46dbe9bd7b1565a69ef7c83e4964c480e1079686c7ffaed1d5942fb4691f8ebe", [:mix], [], "hexpm", "d6adb866b283812bf3fb7177ac88e36fab4d011ae58a8aa7edfa61ba6736cb3e"},
+  "boundary": {:hex, :boundary, "0.6.0", "73f6945477bfb5b4ff6d0eb8bf68153d5ef899ed9d33818888c0ee125dac2f18", [:mix], [], "hexpm", "bf79fa6f5996e92e66c34fa3bdc3fab50676ab44ae46583bca98f25a443ac5bf"},
   "bunt": {:hex, :bunt, "0.2.0", "951c6e801e8b1d2cbe58ebbd3e616a869061ddadcc4863d0a2182541acae9a38", [:mix], [], "hexpm", "7af5c7e09fe1d40f76c8e4f9dd2be7cebd83909f31fee7cd0e9eadc567da8353"},
   "credo": {:hex, :credo, "1.4.0", "92339d4cbadd1e88b5ee43d427b639b68a11071b6f73854e33638e30a0ea11f5", [:mix], [{:bunt, "~> 0.2.0", [hex: :bunt, repo: "hexpm", optional: false]}, {:jason, "~> 1.0", [hex: :jason, repo: "hexpm", optional: false]}], "hexpm", "1fd3b70dce216574ce3c18bdf510b57e7c4c85c2ec9cad4bff854abaf7e58658"},
   "dialyxir": {:hex, :dialyxir, "1.0.0", "6a1fa629f7881a9f5aaf3a78f094b2a51a0357c843871b8bc98824e7342d00a5", [:mix], [{:erlex, ">= 0.2.6", [hex: :erlex, repo: "hexpm", optional: false]}], "hexpm", "aeb06588145fac14ca08d8061a142d52753dbc2cf7f0d00fc1013f53f8654654"},
