@@ -278,23 +278,21 @@ defmodule Cloister.Monitor do
 
         {:ok, ip}
       else
-        {:error, :nxdomain} ->
+        # [_|_] or {:error, :nxdomain}
+        _ ->
           case :inet.getifaddrs() do
             {:ok, ip_addrs} when is_list(ip_addrs) ->
-              {:ok, point_to_point(ip_addrs) || broadcast(ip_addrs)}
+              {:ok, pick_up_addr(ip_addrs)}
 
             _ ->
-              :inet.gethostname()
+              {:ok, :inet.gethostname()}
           end
-
-        _ ->
-          :ok
       end
 
     with {:ok, host} <- maybe_host do
       stopped = Node.stop()
 
-      Logger.debug(
+      Logger.info(
         "[🕸️ :#{node()}] stopped: [#{inspect(stopped)}], starting as: [#{otp_app}@#{host}]."
       )
 
@@ -312,6 +310,7 @@ defmodule Cloister.Monitor do
           {:ok, ip_list} ->
             for {_, _, _, _} = ip4_addr <- ip_list,
                 sentry = :"#{otp_app}@#{ip_addr_to_s(ip4_addr)}",
+                node() != sentry,
                 Node.connect(sentry),
                 do: sentry
 
@@ -326,6 +325,7 @@ defmodule Cloister.Monitor do
 
       [_ | _] = node_list ->
         for sentry <- node_list,
+            node() != sentry,
             Node.connect(sentry),
             do: sentry
     end
@@ -333,6 +333,22 @@ defmodule Cloister.Monitor do
 
   @spec ip_addr_to_s(:inet.ip4_address()) :: binary()
   defp ip_addr_to_s({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
+
+  @spec pick_up_addr([{binary(), any()}]) :: binary() | nil
+  defp pick_up_addr(addrs) do
+    loopback = if Application.get_env(:cloister, :loopback?, false), do: loopback(addrs)
+    loopback || point_to_point(addrs) || broadcast(addrs)
+  end
+
+  # second type http://erlang.org/doc/man/inet.html#type-getifaddrs_ifopts
+  @spec loopback([{binary(), any()}]) :: binary() | nil
+  defp loopback(addrs) do
+    case Enum.filter(addrs, fn {_, addr} -> :loopback in addr[:flags] end) do
+      [] -> nil
+      [{_, addr}] -> ip_addr_to_s(addr[:addr])
+      _many -> with {:ok, host} <- :inet.gethostname(), do: host
+    end
+  end
 
   # second type http://erlang.org/doc/man/inet.html#type-getifaddrs_ifopts
   @spec point_to_point([{binary(), any()}]) :: binary() | nil

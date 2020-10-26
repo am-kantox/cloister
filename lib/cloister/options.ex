@@ -91,6 +91,11 @@ defmodule Cloister.Options do
       keys: [
         name: [required: true, type: :atom, doc: "Name of the `Monitor` process."]
       ]
+    ],
+    loopback?: [
+      doc: "Use loopback interface in FQ node name?",
+      type: :boolean,
+      default: false
     ]
   ]
 
