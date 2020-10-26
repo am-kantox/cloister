@@ -10,7 +10,7 @@
   "libring": {:hex, :libring, "1.5.0", "44313eb6862f5c9168594a061e9d5f556a9819da7c6444706a9e2da533396d70", [:mix], [], "hexpm", "04e843d4fdcff49a62d8e03778d17c6cb2a03fe2d14020d3825a1761b55bd6cc"},
   "makeup": {:hex, :makeup, "1.0.1", "82f332e461dc6c79dbd82fbe2a9c10d48ed07146f0a478286e590c83c52010b5", [:mix], [{:nimble_parsec, "~> 0.5.0", [hex: :nimble_parsec, repo: "hexpm", optional: false]}], "hexpm", "49736fe5b66a08d8575bf5321d716bac5da20c8e6b97714fec2bcd6febcfa1f8"},
   "makeup_elixir": {:hex, :makeup_elixir, "0.14.0", "cf8b7c66ad1cff4c14679698d532f0b5d45a3968ffbcbfd590339cb57742f1ae", [:mix], [{:makeup, "~> 1.0", [hex: :makeup, repo: "hexpm", optional: false]}], "hexpm", "d4b316c7222a85bbaa2fd7c6e90e37e953257ad196dc229505137c5e505e9eff"},
-  "nimble_options": {:hex, :nimble_options, "0.3.0", "1872911bf50a048f04da26e02704e6aeafc362c2daa7636b6dbfda9492ccfcfa", [:mix], [], "hexpm", "180790a8644fea402452bc15bb54b9bf2c8e5c1fdeb6b39d8072e59c324edf7f"},
+  "nimble_options": {:hex, :nimble_options, "0.3.1", "45d4ead006bc8b23a5f689d86d23c062c4895f542c764ea651055b3c5c970a21", [:mix], [], "hexpm", "87a39cfcc1589e2303c715f411371dd41524bac5e7beb4a6f69813f35218256a"},
   "nimble_parsec": {:hex, :nimble_parsec, "0.5.3", "def21c10a9ed70ce22754fdeea0810dafd53c2db3219a0cd54cf5526377af1c6", [:mix], [], "hexpm", "589b5af56f4afca65217a1f3eb3fee7e79b09c40c742fddc1c312b3ac0b3399f"},
   "test_cluster_task": {:hex, :test_cluster_task, "0.5.2", "b6519d48d0422b440dd847693079483c5bf86590aced73a19068aecf6f8d9138", [:mix], [], "hexpm", "029c6f4b3217c095cf76540963aced6e0fdd04cfd2fddc8dba9368a879029d62"},
 }
