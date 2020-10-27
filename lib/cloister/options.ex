@@ -96,6 +96,11 @@ defmodule Cloister.Options do
       doc: "Use loopback interface in FQ node name?",
       type: :boolean,
       default: false
+    ],
+    magic?: [
+      doc: "When false, allows to avoid node reinitialization",
+      type: :boolean,
+      default: true
     ]
   ]
 

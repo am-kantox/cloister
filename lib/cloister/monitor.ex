@@ -50,6 +50,9 @@ defmodule Cloister.Monitor do
   # millis
   @rpc_timeout 5_000
 
+  # millis
+  @nodes_delay 1_000
+
   @doc """
   Used to start `Cloister.Monitor`.
 
@@ -141,9 +144,9 @@ defmodule Cloister.Monitor do
   @doc "Returns the nodes in the cluster that are connected to this one in the same group"
   def siblings, do: GenServer.call(__MODULE__, :siblings)
 
-  @spec nodes! :: t()
+  @spec nodes!(timeout :: non_neg_integer()) :: t()
   @doc "Rehashes the ring and returns the current state"
-  def nodes!, do: GenServer.call(__MODULE__, :nodes!)
+  def nodes!(timeout \\ @nodes_delay), do: GenServer.call(__MODULE__, :nodes!, timeout)
 
   @spec update_groups(args :: keyword()) :: :ok
   @doc false
@@ -280,12 +283,10 @@ defmodule Cloister.Monitor do
       else
         # [_|_] or {:error, :nxdomain}
         _ ->
-          case :inet.getifaddrs() do
-            {:ok, ip_addrs} when is_list(ip_addrs) ->
-              {:ok, pick_up_addr(ip_addrs)}
-
-            _ ->
-              {:ok, :inet.gethostname()}
+          case {Application.get_env(:cloister, :magic?, true), :inet.getifaddrs()} do
+            {false, _} -> :skip
+            {_, {:ok, ip_addrs}} when is_list(ip_addrs) -> {:ok, pick_up_addr(ip_addrs)}
+            _ -> {:ok, :inet.gethostname()}
           end
       end
 
