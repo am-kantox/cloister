@@ -31,7 +31,12 @@ defmodule Cloister.Modules do
                     error
 
                   {true, {:error, {:invalid_ring, :no_nodes}}} ->
-                    Cloister.Monitor.nodes!()
+                    try do
+                      Cloister.Monitor.nodes!()
+                    catch
+                      :exit, _reason -> :skip
+                    end
+
                     whois(unquote(ring), term, false)
 
                   {_, node} ->

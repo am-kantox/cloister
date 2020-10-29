@@ -2,7 +2,7 @@ defmodule Cloister.MixProject do
   use Mix.Project
 
   @app :cloister
-  @version "0.7.0"
+  @version "0.7.1"
 
   def project do
     [
@@ -55,7 +55,7 @@ defmodule Cloister.MixProject do
       {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci]},
       {:dialyxir, "~> 1.0.0", only: [:dev, :ci], runtime: false},
       {:credo, "~> 1.0", only: [:dev, :ci], runtime: false},
-      {:ex_doc, "~> 0.11", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.11", only: :dev}
     ]
   end
 
