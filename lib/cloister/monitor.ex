@@ -311,8 +311,8 @@ defmodule Cloister.Monitor do
           {:ok, ip_list} ->
             for {_, _, _, _} = ip4_addr <- ip_list,
                 sentry = :"#{otp_app}@#{ip_addr_to_s(ip4_addr)}",
-                node() != sentry,
-                Node.connect(sentry),
+                node() != sentry or not loopback?(),
+                node() == sentry or Node.connect(sentry),
                 do: sentry
 
           {:error, :nxdomain} ->
@@ -326,18 +326,20 @@ defmodule Cloister.Monitor do
 
       [_ | _] = node_list ->
         for sentry <- node_list,
-            node() != sentry,
-            Node.connect(sentry),
+            node() != sentry or not loopback?(),
+            node() == sentry or Node.connect(sentry),
             do: sentry
     end
   end
+
+  defp loopback?, do: Application.get_env(:cloister, :loopback?, false)
 
   @spec ip_addr_to_s(:inet.ip4_address()) :: binary()
   defp ip_addr_to_s({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
 
   @spec pick_up_addr([{binary(), any()}]) :: binary() | nil
   defp pick_up_addr(addrs) do
-    loopback = if Application.get_env(:cloister, :loopback?, false), do: loopback(addrs)
+    loopback = if loopback?(), do: loopback(addrs)
     loopback || point_to_point(addrs) || broadcast(addrs)
   end
 
@@ -386,7 +388,7 @@ defmodule Cloister.Monitor do
   @spec register_node(node :: node(), state :: t()) :: t()
   defp register_node(node, %Mon{otp_app: otp_app, ring: ring, status: :up} = state) do
     if node == node() do
-      Logger.debug("[🕸️ :#{node()}] ⏹️  self [#{node}] has been registered")
+      Logger.info("[🕸️ :#{node()}] ⏹️  self [#{node}] has been registered")
       Ring.add_node(ring, node)
       update_group(:add, otp_app, node, state)
     else
@@ -399,12 +401,12 @@ defmodule Cloister.Monitor do
           state
 
         ^otp_app ->
-          Logger.debug("[🕸️ :#{node()}] ⏹️  sibling node [#{node}] has been registered")
+          Logger.info("[🕸️ :#{node()}] ⏹️  sibling node [#{node}] has been registered")
           Ring.add_node(ring, node)
           update_group(:add, otp_app, node, state)
 
         name ->
-          Logger.debug("[🕸️ :#{node()}] ⏹️  cousin node [#{node}] has been registered")
+          Logger.info("[🕸️ :#{node()}] ⏹️  cousin node [#{node}] has been registered")
           update_group(:add, name, node, state)
       end
     end

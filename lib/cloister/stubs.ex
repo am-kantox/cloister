@@ -3,9 +3,10 @@ defmodule Cloister.Modules do
 
   require Logger
 
+  use Boundary, exports: [Stubs]
+
   defmodule Stubs do
     @moduledoc false
-    use Boundary, deps: [], exports: []
 
     @doc false
     @spec create_info_module(ring :: term(), name :: module()) :: module()
@@ -90,8 +91,6 @@ defmodule Cloister.Modules do
       end
     end
   end
-
-  use Boundary, deps: [Cloister.Modules.Stubs], exports: []
 
   @compile {:inline, info_module: 0, listener_module: 0}
 
