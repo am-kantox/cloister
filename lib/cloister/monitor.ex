@@ -307,38 +307,36 @@ defmodule Cloister.Monitor do
 
   defp net_kernel_magic(type, otp_app) do
     maybe_host =
-      case Application.fetch_env!(:cloister, :sentry) do
-        service when is_atom(service) ->
-          with {:ok, s_ips} <- :inet_tcp.getaddrs(service),
-               {:ok, l_ips} <- :inet.getifaddrs() do
-            maybe_ips =
-              for {_, l_ip_info} <- l_ips,
-                  l_ip_info_addr = l_ip_info[:addr],
-                  ^l_ip_info_addr <- s_ips,
-                  do: ip_addr_to_s(l_ip_info_addr)
+      with service when is_atom(service) <- Application.fetch_env!(:cloister, :sentry),
+           {:ok, s_ips} <- :inet_tcp.getaddrs(service),
+           {:ok, l_ips} <- :inet.getifaddrs() do
+        maybe_ips =
+          for {_, l_ip_info} <- l_ips,
+              l_ip_info_addr = l_ip_info[:addr],
+              ^l_ip_info_addr <- s_ips,
+              do: ip_addr_to_s(l_ip_info_addr)
 
-            case maybe_ips do
-              [] ->
-                Logger.warn("[🕸️ :#{node()}] IP could not be found, retrying.")
-                net_kernel_magic(type, otp_app)
+        case maybe_ips do
+          [] ->
+            Logger.warn("[🕸️ :#{node()}] IP could not be found, retrying.")
+            net_kernel_magic(type, otp_app)
 
-              [ip | _] ->
-                Logger.debug("[🕸️ :#{node()}] IP found: #{ip}")
-                {:ok, ip}
-            end
-          else
-            expected when expected == {:error, :nxdomain} or is_list(expected) ->
-              magic? = Application.get_env(:cloister, :magic?, true)
+          [ip | _] ->
+            Logger.debug("[🕸️ :#{node()}] IP found: #{ip}")
+            {:ok, ip}
+        end
+      else
+        expected when expected == {:error, :nxdomain} or is_list(expected) ->
+          magic? = Application.get_env(:cloister, :magic?, true)
 
-              case {magic?, :inet.getifaddrs()} do
-                {false, _} -> {:skip, :magic_disabled_in_config}
-                {_, {:ok, ip_addrs}} when is_list(ip_addrs) -> pick_up_addr(ip_addrs)
-                _ -> :inet.gethostname()
-              end
-
-            other ->
-              {:skip, other}
+          case {magic?, :inet.getifaddrs()} do
+            {false, _} -> {:skip, :magic_disabled_in_config}
+            {_, {:ok, ip_addrs}} when is_list(ip_addrs) -> pick_up_addr(ip_addrs)
+            _ -> :inet.gethostname()
           end
+
+        other ->
+          {:skip, other}
       end
 
     node_restart(maybe_host, otp_app)
