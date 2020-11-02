@@ -18,6 +18,9 @@ defmodule Cloister.Monitor do
   @typedoc "Group of nodes sharing the same hashring"
   @type group :: {atom(), [node()]}
 
+  @typedoc "Type of the node as it has been started"
+  @type node_type :: :longnames | :shortnames | :nonode
+
   @typedoc "The monitor internal state"
   @type t :: %{
           __struct__: Cloister.Monitor,
@@ -76,7 +79,7 @@ defmodule Cloister.Monitor do
     [{top_app, _, _} | _] = Application.loaded_applications()
     otp_app = Keyword.get(state, :otp_app, top_app)
 
-    net_kernel_magic(otp_app)
+    net_kernel_magic(node_type(), otp_app)
 
     unless Keyword.has_key?(state, :ring),
       do: Ring.new(otp_app)
@@ -265,42 +268,81 @@ defmodule Cloister.Monitor do
 
   #############################################################################
 
-  @spec net_kernel_magic(otp_app :: atom()) :: :ok
-  defp net_kernel_magic(otp_app) do
+  @spec node_type :: node_type()
+  defp node_type do
+    case node() do
+      :nonode@nohost ->
+        :nonode
+
+      name ->
+        name
+        |> Atom.to_string()
+        |> String.split("@")
+        |> List.last()
+        |> String.contains?(".")
+        |> if(do: :longnames, else: :shortnames)
+    end
+  end
+
+  @spec node_restart({:ok, binary()} | {:skip, any()}, otp_app :: atom()) ::
+          {:ok, pid() | :error, term()}
+  defp node_restart({:skip, any}, _otp_app) do
+    Logger.warn("[🕸️ :#{node()}] skipping restart, expected host, got: [#{inspect(any)}].")
+    {:error, any}
+  end
+
+  defp node_restart({:ok, host}, otp_app) do
+    stopped = Node.stop()
+
+    Logger.info(
+      "[🕸️ :#{node()}] stopped: [#{inspect(stopped)}], starting as: [#{otp_app}@#{host}]."
+    )
+
+    Node.start(:"#{otp_app}@#{host}")
+  end
+
+  @spec net_kernel_magic(type :: node_type(), otp_app :: atom()) :: :ok
+  defp net_kernel_magic(:longnames, _otp_app),
+    do: :ok = :net_kernel.monitor_nodes(true, node_type: :all)
+
+  defp net_kernel_magic(type, otp_app) do
     maybe_host =
-      with service when is_atom(service) <- Application.get_env(:cloister, :sentry, []),
-           {:ok, s_ips} <- :inet_tcp.getaddrs(service),
-           {:ok, l_ips} <- :inet.getifaddrs() do
-        [ip | _] =
-          for {_, l_ip_info} <- l_ips,
-              l_ip_info_addr = l_ip_info[:addr],
-              ^l_ip_info_addr <- s_ips,
-              do: ip_addr_to_s(l_ip_info_addr)
+      case Application.fetch_env!(:cloister, :sentry) do
+        service when is_atom(service) ->
+          with {:ok, s_ips} <- :inet_tcp.getaddrs(service),
+               {:ok, l_ips} <- :inet.getifaddrs() do
+            maybe_ips =
+              for {_, l_ip_info} <- l_ips,
+                  l_ip_info_addr = l_ip_info[:addr],
+                  ^l_ip_info_addr <- s_ips,
+                  do: ip_addr_to_s(l_ip_info_addr)
 
-        Logger.debug("[🕸️ :#{node()}] IP found: #{ip}")
+            case maybe_ips do
+              [] ->
+                Logger.warn("[🕸️ :#{node()}] IP could not be found, retrying.")
+                net_kernel_magic(type, otp_app)
 
-        {:ok, ip}
-      else
-        # [_|_] or {:error, :nxdomain}
-        _ ->
-          case {Application.get_env(:cloister, :magic?, true), :inet.getifaddrs()} do
-            {false, _} -> :skip
-            {_, {:ok, ip_addrs}} when is_list(ip_addrs) -> {:ok, pick_up_addr(ip_addrs)}
-            _ -> {:ok, :inet.gethostname()}
+              [ip | _] ->
+                Logger.debug("[🕸️ :#{node()}] IP found: #{ip}")
+                {:ok, ip}
+            end
+          else
+            expected when expected == {:error, :nxdomain} or is_list(expected) ->
+              magic? = Application.get_env(:cloister, :magic?, true)
+
+              case {magic?, :inet.getifaddrs()} do
+                {false, _} -> {:skip, :magic_disabled_in_config}
+                {_, {:ok, ip_addrs}} when is_list(ip_addrs) -> pick_up_addr(ip_addrs)
+                _ -> :inet.gethostname()
+              end
+
+            other ->
+              {:skip, other}
           end
       end
 
-    with {:ok, host} <- maybe_host do
-      stopped = Node.stop()
-
-      Logger.info(
-        "[🕸️ :#{node()}] stopped: [#{inspect(stopped)}], starting as: [#{otp_app}@#{host}]."
-      )
-
-      Node.start(:"#{otp_app}@#{host}")
-    end
-
-    :ok = :net_kernel.monitor_nodes(true, node_type: :all)
+    node_restart(maybe_host, otp_app)
+    net_kernel_magic(:longnames, otp_app)
   end
 
   @spec active_sentry(otp_app :: atom()) :: [node()]
@@ -311,7 +353,6 @@ defmodule Cloister.Monitor do
           {:ok, ip_list} ->
             for {_, _, _, _} = ip4_addr <- ip_list,
                 sentry = :"#{otp_app}@#{ip_addr_to_s(ip4_addr)}",
-                node() != sentry or not loopback?(),
                 node() == sentry or Node.connect(sentry),
                 do: sentry
 
@@ -326,7 +367,6 @@ defmodule Cloister.Monitor do
 
       [_ | _] = node_list ->
         for sentry <- node_list,
-            node() != sentry or not loopback?(),
             node() == sentry or Node.connect(sentry),
             do: sentry
     end

@@ -20,6 +20,8 @@ defmodule Cloister.Modules do
             quote do
               @moduledoc false
 
+              require Logger
+
               @spec whois(group :: atom(), term :: term(), retry? :: boolean()) ::
                       {:ok, node()} | {:error, {:not_our_ring, atom()}}
               def whois(group \\ nil, term, retry? \\ true)
@@ -35,7 +37,8 @@ defmodule Cloister.Modules do
                     try do
                       Cloister.Monitor.nodes!()
                     catch
-                      :exit, _reason -> :skip
+                      :exit, _reason ->
+                        Logger.warn("Ring #{unquote(ring)} is not yet assembled, retrying.")
                     end
 
                     whois(unquote(ring), term, false)
