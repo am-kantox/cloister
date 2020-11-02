@@ -378,7 +378,11 @@ defmodule Cloister.Monitor do
   @spec pick_up_addr([{binary(), any()}]) :: binary() | nil
   defp pick_up_addr(addrs) do
     loopback = if loopback?(), do: loopback(addrs)
-    loopback || point_to_point(addrs) || broadcast(addrs)
+
+    case loopback || point_to_point(addrs) || broadcast(addrs) do
+      addr when is_binary(addr) -> {:ok, addr}
+      _other -> {:skip, {:unfit, addrs}}
+    end
   end
 
   # second type http://erlang.org/doc/man/inet.html#type-getifaddrs_ifopts
