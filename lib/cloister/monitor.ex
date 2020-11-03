@@ -285,7 +285,7 @@ defmodule Cloister.Monitor do
   end
 
   @spec node_restart({:ok, binary()} | {:skip, any()}, otp_app :: atom()) ::
-          {:ok, pid() | :error, term()}
+          {:ok, pid()} | {:error, term()}
   defp node_restart({:skip, any}, _otp_app) do
     Logger.warn("[🕸️ :#{node()}] skipping restart, expected host, got: [#{inspect(any)}].")
     {:error, any}
@@ -375,7 +375,7 @@ defmodule Cloister.Monitor do
   @spec ip_addr_to_s(:inet.ip4_address()) :: binary()
   defp ip_addr_to_s({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
 
-  @spec pick_up_addr([{binary(), any()}]) :: binary() | nil
+  @spec pick_up_addr([{[binary()], [any()]}]) :: {:ok, binary()} | {:skip, any()}
   defp pick_up_addr(addrs) do
     loopback = if loopback?(), do: loopback(addrs)
 
