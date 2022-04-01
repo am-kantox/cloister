@@ -35,6 +35,17 @@ defmodule Cloister do
   @doc "Returns `true` if the hashring points to this node for the term given, `false` otherwise"
   def mine?(term), do: whois(term) == node()
 
+  @spec multiapply(nil | [node()], module(), atom(), list()) :: any()
+  @doc """
+  Applies the function given as `m, f, a` on all the nodes given as a first parameter.
+
+  If no `nodes` are given, it defaults to `Cloister.siblings/0`.
+  """
+  def multiapply(nodes \\ nil, m, f, a \\ []) do
+    nodes = if is_nil(nodes), do: Cloister.siblings(), else: nodes
+    :rpc.multicall(nodes, m, f, a)
+  end
+
   @spec ring :: atom()
   @doc "Returns the `ring` from current node cloister monitor state"
   def ring, do: Cloister.Modules.info_module().ring()

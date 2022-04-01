@@ -59,9 +59,6 @@ defmodule Cloister.Application do
     do: wait_consensus(consensus, retries)
 
   defp do_wait_consensus(nodes, consensus, retries) when is_list(nodes) do
-    # TODO understand if this might boost the startup
-    # nodes = [node() | Node.list()]
-
     nodes
     |> Enum.count()
     |> case do
