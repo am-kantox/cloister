@@ -27,6 +27,7 @@ config :cloister,
 
 ## Changelog
 
+- **`0.9.0`** `Cloister.multiapply/4` to wrap `:rpc.multicall/4`
 - **`0.7.0`** `magic? :: boolean()` and `loopback? :: boolean()` config params to avoid cluster building in tests
 - **`0.6.0`** support many hashrings within the same cloister
 - **`0.2.0`** use `Application.c:start_phase/3` callback to postpone application start until the consensus is reached
