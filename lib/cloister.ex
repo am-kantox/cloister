@@ -41,7 +41,7 @@ defmodule Cloister do
 
   If no `nodes` are given, it defaults to `Cloister.siblings/0`.
   """
-  def multiapply(nodes \\ nil, m, f, a \\ []) do
+  def multiapply(nodes \\ nil, m, f, a) do
     nodes = if is_nil(nodes), do: Cloister.siblings(), else: nodes
     :rpc.multicall(nodes, m, f, a)
   end

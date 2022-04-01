@@ -99,7 +99,7 @@ defmodule Cloister.Modules do
 
   @cloister_env Application.get_all_env(:cloister)
 
-  @ring Keyword.get(@cloister_env, :ring, Application.get_env(:cloister, :otp_app, :cloister))
+  @ring Keyword.get(@cloister_env, :ring, Application.compile_env(:cloister, :otp_app, :cloister))
 
   @info_module Keyword.get_lazy(@cloister_env, :monitor, fn -> Stubs.create_info_module(@ring) end)
   @spec info_module :: module()
