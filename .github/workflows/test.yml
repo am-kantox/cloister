@@ -7,6 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     name: OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - pair:
@@ -16,21 +17,28 @@ jobs:
               otp: 24.3
               elixir: 1.13.3
     steps:
-      - uses: actions/checkout@v2
-      - uses: erlef/setup-elixir@v1
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Build and Test
+        uses: erlef/setup-elixir@v1
         with:
-          otp-version: ${{matrix.otp}}
-          elixir-version: ${{matrix.elixir}}
+          elixir-version: ${{matrix.pair.elixir}}
+          otp-version: ${{matrix.pair.otp}}
+
       - name: Conform
         uses: talos-systems/conform@v0.1.0-alpha.19
+
       - name: Install → Compile dependencies
         run: |
           MIX_ENV=test mix deps.get
           MIX_ENV=test mix deps.compile
           MIX_ENV=test mix compile
+
       - name: Start epmd
         run: |
           epmd -daemon
+
       - name: Run tests
         run: |
           MIX_ENV=test mix test
