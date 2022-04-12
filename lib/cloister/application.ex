@@ -6,7 +6,7 @@ defmodule Cloister.Application do
   require Logger
 
   @consensus 3
-  @consensus_timeout 3_000
+  @consensus_timeout 1_000
 
   @impl Application
   def start(_type, _args) do
