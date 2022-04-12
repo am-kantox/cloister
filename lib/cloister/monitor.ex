@@ -367,7 +367,11 @@ defmodule Cloister.Monitor do
 
           {:error, :nxdomain} ->
             Logger.warn("[🕸️ :#{node()}] Service not found: #{inspect(service)}.")
-            [node()]
+
+            case Cloister.Application.consensus() do
+              1 -> [node()]
+              _ -> []
+            end
 
           {:error, reason} ->
             Logger.warn("[🕸️ #{inspect(service)}] :#{node()} ❓: #{inspect(reason)}.")
