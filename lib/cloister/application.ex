@@ -6,7 +6,7 @@ defmodule Cloister.Application do
   require Logger
 
   @consensus 3
-  @consensus_timeout 1_000
+  @consensus_timeout 2_000
 
   @impl Application
   def start(_type, _args) do
@@ -78,8 +78,9 @@ defmodule Cloister.Application do
 
         case div(retries, 10) do
           0 -> Logger.info(message)
-          n when n < 100 and rem(retries, 10) == 0 -> Logger.warn(message)
-          _ when rem(retries, 100) == 0 -> Logger.error(message)
+          r when r < 10 and rem(retries, 10) == 0 -> Logger.warn(message)
+          r when r >= 10 and rem(retries, 100) == 0 -> Logger.error(message)
+          _ -> :ok
         end
 
         wait_consensus(consensus, retries + 1)
