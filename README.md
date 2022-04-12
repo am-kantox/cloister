@@ -27,6 +27,7 @@ config :cloister,
 
 ## Changelog
 
+- **`0.10.0`** `Cloister.siblings!/0` and `Cloister.consensus/0`, better tests
 - **`0.9.0`** `Cloister.multiapply/4` to wrap `:rpc.multicall/4`
 - **`0.7.0`** `magic? :: boolean()` and `loopback? :: boolean()` config params to avoid cluster building in tests
 - **`0.6.0`** support many hashrings within the same cloister

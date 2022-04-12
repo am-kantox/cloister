@@ -52,6 +52,7 @@ defmodule Cloister do
 
   defdelegate state, to: Cloister.Monitor
   defdelegate siblings, to: Cloister.Monitor
+  defdelegate siblings!, to: Cloister.Monitor
   defdelegate multicast(name, request), to: Cloister.Node
   defdelegate multicall(name, request), to: Cloister.Node
   defdelegate multicall(nodes, name, request), to: Cloister.Node

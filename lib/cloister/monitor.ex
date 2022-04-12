@@ -56,6 +56,9 @@ defmodule Cloister.Monitor do
   # millis
   @nodes_delay 1_000
 
+  # millis
+  @quorum_retry_interval 1_000
+
   @doc """
   Used to start `Cloister.Monitor`.
 
@@ -118,6 +121,7 @@ defmodule Cloister.Monitor do
   defp do_handle_quorum(true, %Mon{otp_app: otp_app} = state) do
     case active_sentry(otp_app) do
       [] ->
+        Process.sleep(@quorum_retry_interval)
         {:noreply, state, {:continue, :quorum}}
 
       [_ | _] = active_sentry ->
@@ -146,6 +150,13 @@ defmodule Cloister.Monitor do
   @spec siblings :: [node()]
   @doc "Returns the nodes in the cluster that are connected to this one in the same group"
   def siblings, do: GenServer.call(__MODULE__, :siblings)
+
+  @doc false
+  @spec siblings! :: [node()] | {:error, :no_such_ring}
+  def siblings! do
+    %Mon{otp_app: otp_app, groups: groups} = nodes!()
+    groups[otp_app] || Cloister.Modules.info_module().nodes()
+  end
 
   @spec nodes!(timeout :: non_neg_integer()) :: t()
   @doc "Rehashes the ring and returns the current state"

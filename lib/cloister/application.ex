@@ -31,31 +31,41 @@ defmodule Cloister.Application do
 
   @impl Application
   def start_phase(:warming_up, _start_type, phase_args) do
-    phase_args
-    |> Keyword.get(:consensus, Application.get_env(:cloister, :consensus, @consensus))
-    |> wait_consensus(0)
+    cloister_consensus =
+      Keyword.get(phase_args, :consensus, Application.get_env(:cloister, :consensus, @consensus))
 
-    Logger.info("[🕸️ :#{node()}] Cloister → Phase I. Warming up, waiting for consensus.")
+    Process.put(:cloister_consensus, cloister_consensus)
+
+    Logger.info(
+      "[🕸️ :#{node()}] Cloister → Phase I. Warming up, waiting for consensus [#{cloister_consensus}]."
+    )
+
+    wait_consensus(cloister_consensus, 0)
+    :ok
   end
 
   @impl Application
   def start_phase(:rehash_on_up, _start_type, phase_args) do
-    Cloister.Monitor.update_groups(phase_args)
     Logger.info("[🕸️ :#{node()}] Cloister → Phase II. Updating groups.")
+    Cloister.Monitor.update_groups(phase_args)
+    :ok
   end
+
+  @spec consensus :: non_neg_integer()
+  def consensus, do: Process.get(:cloister_consensus, @consensus)
 
   @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
   defp wait_consensus(consensus, retries) do
     Process.sleep(@consensus_timeout)
-    do_wait_consensus(Cloister.Modules.info_module().nodes(), consensus, retries)
+    do_wait_consensus(Cloister.siblings!(), consensus, retries)
   end
 
   @spec do_wait_consensus(
-          [node() | {:error, :no_such_ring}],
+          [node()] | {:error, :no_such_ring},
           consensus :: non_neg_integer(),
           retries :: non_neg_integer()
         ) :: :ok
-  defp do_wait_consensus([{:error, :no_such_ring} | _], consensus, retries),
+  defp do_wait_consensus({:error, :no_such_ring}, consensus, retries),
     do: wait_consensus(consensus, retries)
 
   defp do_wait_consensus(nodes, consensus, retries) when is_list(nodes) do
@@ -66,8 +76,9 @@ defmodule Cloister.Application do
         message = "[🕸️ :#{node()}] ⏳ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]"
 
         case div(retries, 10) do
-          0 -> Logger.warn(message)
-          _ -> Logger.debug(message)
+          0 -> Logger.info(message)
+          n when n < 100 and rem(retries, 10) == 0 -> Logger.warn(message)
+          _ when rem(retries, 100) == 0 -> Logger.error(message)
         end
 
         wait_consensus(consensus, retries + 1)

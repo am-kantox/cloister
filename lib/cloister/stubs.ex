@@ -50,7 +50,7 @@ defmodule Cloister.Modules do
 
               def whois(ring, _, _), do: {:error, {:not_our_ring, ring}}
 
-              @spec nodes :: [term()] | {:error, :no_such_ring}
+              @spec nodes :: [node()] | {:error, :no_such_ring}
               def nodes,
                 do: HashRing.Managed.nodes(unquote(ring))
 
