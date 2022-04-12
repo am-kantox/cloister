@@ -57,7 +57,8 @@ defmodule Cloister.Application do
   @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
   defp wait_consensus(consensus, retries) do
     Process.sleep(@consensus_timeout)
-    do_wait_consensus(Cloister.siblings!(), consensus, retries)
+    # Cloister.siblings!()
+    do_wait_consensus(Cloister.Modules.info_module().nodes(), consensus, retries)
   end
 
   @spec do_wait_consensus(

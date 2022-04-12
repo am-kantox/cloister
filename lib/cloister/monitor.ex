@@ -57,7 +57,7 @@ defmodule Cloister.Monitor do
   @nodes_delay 1_000
 
   # millis
-  @quorum_retry_interval 1_000
+  @quorum_retry_interval 100
 
   @doc """
   Used to start `Cloister.Monitor`.
