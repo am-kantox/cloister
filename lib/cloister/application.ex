@@ -31,16 +31,14 @@ defmodule Cloister.Application do
 
   @impl Application
   def start_phase(:warming_up, _start_type, phase_args) do
-    cloister_consensus =
-      Keyword.get(phase_args, :consensus, Application.get_env(:cloister, :consensus, @consensus))
-
-    Process.put(:cloister_consensus, cloister_consensus)
+    consensus = Keyword.get(phase_args, :consensus, consensus())
+    Application.put_env(:cloister, :consensus, consensus)
 
     Logger.info(
-      "[🕸️ :#{node()}] Cloister → Phase I. Warming up, waiting for consensus [#{cloister_consensus}]."
+      "[🕸️ :#{node()}] Cloister → Phase I. Warming up, waiting for consensus [#{consensus}]."
     )
 
-    wait_consensus(cloister_consensus, 0)
+    wait_consensus(consensus, 0)
     :ok
   end
 
@@ -52,7 +50,7 @@ defmodule Cloister.Application do
   end
 
   @spec consensus :: non_neg_integer()
-  def consensus, do: Process.get(:cloister_consensus, @consensus)
+  def consensus, do: Application.get_env(:cloister, :consensus, @consensus)
 
   @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
   defp wait_consensus(consensus, retries) do
