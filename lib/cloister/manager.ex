@@ -8,7 +8,9 @@ defmodule Cloister.Manager do
   of your application `mix.exs` to prevent the application from starting up
   during the dependent applications starting phase.
   """
+
   use Supervisor
+  require Logger
 
   @doc "Starts the cloister manager process in the supervision tree"
   @spec start_link(opts :: keyword()) :: GenServer.on_start()
@@ -33,7 +35,17 @@ defmodule Cloister.Manager do
         Application.get_env(:cloister, :additional_modules, [])
       )
 
-    additional_modules = Enum.filter(additional_modules, &ensure_compiled?/1)
+    {additional_modules, failed_modules} =
+      Enum.split_with(additional_modules, &ensure_compiled?/1)
+
+    if failed_modules != [],
+      do: Logger.warn("Following configured modules failed to start: " <> inspect(failed_modules))
+
+    Finitomata.start_fsm(
+      Cloister.Monitor.Fsm,
+      Cloister.Monitor.Fsm,
+      Map.new([{:state, state} | monitor_opts])
+    )
 
     children =
       [

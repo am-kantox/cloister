@@ -18,10 +18,11 @@ defmodule Cloister.Application do
     manager = Application.get_env(:cloister, :manager, [])
 
     children = [
+      Finitomata.child_spec(),
       {Cloister.Manager, [manager]}
     ]
 
-    opts = [strategy: :one_for_one, name: Cloister.Supervisor]
+    opts = [strategy: :one_for_all, name: Cloister.Supervisor]
     Supervisor.start_link(children, opts)
   end
 
