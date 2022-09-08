@@ -41,12 +41,6 @@ defmodule Cloister.Manager do
     if failed_modules != [],
       do: Logger.warn("Following configured modules failed to start: " <> inspect(failed_modules))
 
-    Finitomata.start_fsm(
-      Cloister.Monitor.Fsm,
-      Cloister.Monitor.Fsm,
-      Map.new([{:state, state} | monitor_opts])
-    )
-
     children =
       [
         {Cloister.Monitor, [{:state, state} | monitor_opts]},

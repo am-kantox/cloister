@@ -8,6 +8,8 @@ defmodule Cloister.Monitor do
 
   use Boundary, deps: [Cloister.Modules], exports: []
 
+  alias Cloister.Monitor, as: Mon
+  alias Cloister.Monitor.Fsm
   alias HashRing.Managed, as: Ring
 
   require Logger
@@ -25,10 +27,9 @@ defmodule Cloister.Monitor do
   @type t :: %{
           __struct__: Cloister.Monitor,
           otp_app: atom(),
+          fsm: Finitomata.fsm_name(),
           groups: [group()],
-          listener: module(),
           started_at: DateTime.t(),
-          status: status(),
           alive?: boolean(),
           clustered?: boolean(),
           sentry?: boolean(),
@@ -36,16 +37,13 @@ defmodule Cloister.Monitor do
         }
 
   defstruct otp_app: :cloister,
+            fsm: nil,
             groups: [],
-            listener: nil,
             started_at: nil,
-            status: :down,
             alive?: false,
             clustered?: false,
             sentry?: false,
             ring: nil
-
-  alias Cloister.Monitor, as: Mon
 
   # millis
   @refresh_rate 300
@@ -81,18 +79,23 @@ defmodule Cloister.Monitor do
   def init(state) do
     [{top_app, _, _} | _] = Application.loaded_applications()
     otp_app = Keyword.get(state, :otp_app, top_app)
+    fsm = Keyword.get(state, :fsm, "Monitor")
 
     net_kernel_magic(node_type(), otp_app)
 
     unless Keyword.has_key?(state, :ring),
       do: Ring.new(otp_app)
 
+    Finitomata.start_fsm(Cloister.Monitor.Fsm, fsm, %Fsm{
+      monitor: self(),
+      listener: Cloister.Modules.listener_module()
+    })
+
     state =
       state
       |> Keyword.put_new(:otp_app, otp_app)
+      |> Keyword.put_new(:fsm, fsm)
       |> Keyword.put_new(:started_at, DateTime.utc_now())
-      |> Keyword.put_new(:listener, Cloister.Modules.listener_module())
-      |> Keyword.put_new(:status, :starting)
       |> Keyword.put_new(:ring, otp_app)
 
     {:ok, struct(__MODULE__, state), {:continue, :quorum}}
@@ -101,12 +104,9 @@ defmodule Cloister.Monitor do
   @impl GenServer
   @doc false
   def terminate(reason, %Mon{} = state) do
-    Logger.warn(
-      "[🕸️ :#{node()}] ⏹️  reason: [" <> inspect(reason) <> "], state: [" <> inspect(state) <> "]"
-    )
-
-    state = notify(:stopping, state)
-    notify(:down, state)
+    Finitomata.transition(state.fsm, {:stop, nil})
+    Finitomata.transition(state.fsm, {:terminate, %{reason: reason}})
+    Finitomata.transition(state.fsm, {:__end__, nil})
   end
 
   @impl GenServer
@@ -262,14 +262,14 @@ defmodule Cloister.Monitor do
     notify(status, state)
   end
 
-  @spec notify(to :: status(), state :: t()) :: t()
-  defp notify(to, %{status: to} = state), do: reschedule(state)
+  # @spec notify(to :: status(), state :: t()) :: t()
+  # defp notify(to, %{status: to} = state), do: reschedule(state)
 
-  defp notify(to, %{status: from} = state) do
-    state = %Mon{state | status: to}
-    Cloister.Modules.listener_module().on_state_change(from, state)
-    reschedule(state)
-  end
+  # defp notify(to, %{status: from} = state) do
+  #   state = %Mon{state | status: to}
+  #   Cloister.Modules.listener_module().on_state_change(from, state)
+  #   reschedule(state)
+  # end
 
   @spec reschedule(state :: t()) :: t()
   defp reschedule(state) do
