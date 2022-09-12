@@ -24,10 +24,6 @@ defmodule Cloister.Manager do
   @doc false
   @impl Supervisor
   def init(state) do
-    state = Keyword.put_new(state, :otp_app, Application.get_env(:cloister, :otp_app, :cloister))
-
-    {monitor_opts, state} = Keyword.pop(state, :monitor_opts, [])
-
     {additional_modules, state} =
       Keyword.pop(
         state,
@@ -41,9 +37,15 @@ defmodule Cloister.Manager do
     if failed_modules != [],
       do: Logger.warn("Following configured modules failed to start: " <> inspect(failed_modules))
 
+    state =
+      state
+      |> Keyword.put_new(:otp_app, Application.get_env(:cloister, :otp_app, :cloister))
+      |> Keyword.put_new(:listener, Cloister.Modules.listener_module())
+
+    Finitomata.start_fsm(Cloister.Monitor, fsm, struct!(Mon, state))
+
     children =
       [
-        {Cloister.Monitor, [{:state, state} | monitor_opts]},
         Cloister,
         Cloister.Node
       ] ++ additional_modules

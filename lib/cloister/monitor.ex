@@ -9,7 +9,6 @@ defmodule Cloister.Monitor do
   use Boundary, deps: [Cloister.Modules], exports: []
 
   alias Cloister.Monitor, as: Mon
-  alias Cloister.Monitor.Fsm
   alias HashRing.Managed, as: Ring
 
   require Logger
@@ -27,7 +26,6 @@ defmodule Cloister.Monitor do
   @type t :: %{
           __struct__: Cloister.Monitor,
           otp_app: atom(),
-          fsm: Finitomata.fsm_name(),
           groups: [group()],
           started_at: DateTime.t(),
           alive?: boolean(),
@@ -37,7 +35,6 @@ defmodule Cloister.Monitor do
         }
 
   defstruct otp_app: :cloister,
-            fsm: nil,
             groups: [],
             started_at: nil,
             alive?: false,
@@ -57,72 +54,43 @@ defmodule Cloister.Monitor do
   # millis
   @quorum_retry_interval 100
 
-  @doc """
-  Used to start `Cloister.Monitor`.
-
-  Internally called by `Cloister.Manager.start_link/1`. In most cases
-    you don’t need to start `Monitor` process explicitly.
+  @fsm """
+  down --> |rehash!| rehashing
+  rehashing --> |up| ready
+  rehashing --> |rehash| rehashing
+  rehashing --> |down| stopping
+  ready --> |up| ready
+  ready --> |down| ready
+  ready --> |down| rehashing
+  stopping --> |stop!| stopped
   """
-  @spec start_link(opts :: keyword()) :: GenServer.on_start()
-  def start_link(opts \\ []) do
-    {state, opts} = Keyword.pop(opts, :state, [])
 
-    GenServer.start_link(
-      __MODULE__,
-      state,
-      Keyword.put_new(opts, :name, __MODULE__)
-    )
+  use Finitomata, fsm: @fsm, auto_terminate: true, ensure_entry: [:down], timer: 1_000
+
+  @impl Finitomata
+  def on_timer(:rehashing, %Mon{} = state) do
+    Node.alive?()
+    |> do_handle_quorum(state)
+    |> case do
+      :error -> {:transition, :rehash, state}
+      {:ok, state} -> {:transition, :rehash, state}
+    end
   end
 
-  @impl GenServer
-  @doc false
-  def init(state) do
-    [{top_app, _, _} | _] = Application.loaded_applications()
-    otp_app = Keyword.get(state, :otp_app, top_app)
-    fsm = Keyword.get(state, :fsm, "Monitor")
+  @impl Finitomata
+  def on_transition(:*, :__start__, _, %Mon{} = state) do
+    ring = if is_nil(state.ring), do: Ring.new(state.otp_app), else: state.ring
+    net_kernel_magic(node_type(), state.otp_app)
 
-    net_kernel_magic(node_type(), otp_app)
-
-    unless Keyword.has_key?(state, :ring),
-      do: Ring.new(otp_app)
-
-    Finitomata.start_fsm(Cloister.Monitor.Fsm, fsm, %Fsm{
-      monitor: self(),
-      listener: Cloister.Modules.listener_module()
-    })
-
-    state =
-      state
-      |> Keyword.put_new(:otp_app, otp_app)
-      |> Keyword.put_new(:fsm, fsm)
-      |> Keyword.put_new(:started_at, DateTime.utc_now())
-      |> Keyword.put_new(:ring, otp_app)
-
-    {:ok, struct(__MODULE__, state), {:continue, :quorum}}
+    {:ok, :down, %Mon{state | ring: ring, started_at: DateTime.utc_now()}}
   end
 
-  @impl GenServer
   @doc false
-  def terminate(reason, %Mon{} = state) do
-    Finitomata.transition(state.fsm, {:stop, nil})
-    Finitomata.transition(state.fsm, {:terminate, %{reason: reason}})
-    Finitomata.transition(state.fsm, {:__end__, nil})
-  end
-
-  @impl GenServer
-  @doc false
-  def handle_continue(:quorum, %Mon{} = state),
-    do: do_handle_quorum(Node.alive?(), state)
-
-  @spec do_handle_quorum(boolean(), state :: t()) ::
-          {:noreply, new_state} | {:noreply, new_state, {:continue, :quorum}}
-        when new_state: t()
-  @doc false
+  @spec do_handle_quorum(boolean(), state) :: {:ok, state} | :error when state: t()
   defp do_handle_quorum(true, %Mon{otp_app: otp_app} = state) do
     case active_sentry(otp_app) do
       [] ->
-        Process.sleep(@quorum_retry_interval)
-        {:noreply, state, {:continue, :quorum}}
+        :error
 
       [_ | _] = active_sentry ->
         state = %Mon{
@@ -132,14 +100,15 @@ defmodule Cloister.Monitor do
             clustered?: true
         }
 
-        state = update_group(:add, otp_app, node(), state)
-        {:noreply, notify(:joined, state)}
+        # [AM] state = update_group(:add, otp_app, node(), state)
+
+        {:ok, notify(:joined, state)}
     end
   end
 
   @doc false
   defp do_handle_quorum(false, %Mon{} = state),
-    do: {:noreply, notify(:rehashing, %Mon{state | sentry?: true, clustered?: false})}
+    do: {:ok, notify(:rehashing, %Mon{state | sentry?: true, clustered?: false})}
 
   ##############################################################################
 
@@ -161,10 +130,6 @@ defmodule Cloister.Monitor do
   @spec nodes!(timeout :: non_neg_integer()) :: t()
   @doc "Rehashes the ring and returns the current state"
   def nodes!(timeout \\ @nodes_delay), do: GenServer.call(__MODULE__, :nodes!, timeout)
-
-  @spec update_groups(args :: keyword()) :: :ok
-  @doc false
-  def update_groups(args), do: GenServer.cast(__MODULE__, {:update_groups, args})
 
   ##############################################################################
 
@@ -428,19 +393,6 @@ defmodule Cloister.Monitor do
       _any -> with {:ok, host} <- :inet.gethostname(), do: host
     end
   end
-
-  @spec update_group(:add | :remove, group :: atom(), who :: node(), state :: t()) :: t()
-  defp update_group(:add, group, who, %Mon{groups: groups, status: :up} = state) do
-    groups = Keyword.update(groups, group, [who], &Enum.uniq([who | &1]))
-    %Mon{state | groups: groups}
-  end
-
-  defp update_group(:remove, group, who, %Mon{groups: groups, status: :up} = state) do
-    groups = Keyword.update!(groups, group, &List.delete(&1, who))
-    %Mon{state | groups: groups}
-  end
-
-  defp update_group(_, _, _, state), do: state
 
   @spec register_node(node :: node(), state :: t()) :: t()
   defp register_node(node, %Mon{otp_app: otp_app, ring: ring, status: :up} = state) do
