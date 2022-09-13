@@ -28,7 +28,6 @@ defmodule Cloister.Monitor do
           groups: [group()],
           listener: module(),
           started_at: DateTime.t(),
-          status: status(),
           alive?: boolean(),
           clustered?: boolean(),
           sentry?: boolean(),
@@ -39,7 +38,6 @@ defmodule Cloister.Monitor do
             groups: [],
             listener: nil,
             started_at: nil,
-            status: :down,
             alive?: false,
             clustered?: false,
             sentry?: false,
@@ -79,67 +77,32 @@ defmodule Cloister.Monitor do
   @impl GenServer
   @doc false
   def init(state) do
-    [{top_app, _, _} | _] = Application.loaded_applications()
-    otp_app = Keyword.get(state, :otp_app, top_app)
-
-    net_kernel_magic(node_type(), otp_app)
-
-    unless Keyword.has_key?(state, :ring),
-      do: Ring.new(otp_app)
+    otp_app = fn ->
+      Keyword.get(state, :otp_app) ||
+        case Application.loaded_applications() do
+          [{top_app, _, _} | _] -> top_app
+          _ -> :closter
+        end
+    end
 
     state =
       state
-      |> Keyword.put_new(:otp_app, otp_app)
-      |> Keyword.put_new(:started_at, DateTime.utc_now())
+      |> Keyword.put_new_lazy(:otp_app, otp_app)
       |> Keyword.put_new(:listener, Cloister.Modules.listener_module())
-      |> Keyword.put_new(:status, :starting)
-      |> Keyword.put_new(:ring, otp_app)
 
-    {:ok, struct(__MODULE__, state), {:continue, :quorum}}
+    fsm_name = "monitor_#{state[:otp_app]}"
+
+    Finitomata.start_fsm(Cloister.Monitor.Fsm, fsm_name)
+
+    {:ok, %{fsm: fsm_name}}
   end
 
   @impl GenServer
   @doc false
-  def terminate(reason, %Mon{} = state) do
-    Logger.warn(
-      "[🕸️ :#{node()}] ⏹️  reason: [" <> inspect(reason) <> "], state: [" <> inspect(state) <> "]"
-    )
-
-    state = notify(:stopping, state)
-    notify(:down, state)
+  def terminate(reason, %{fsm: fsm}) do
+    Logger.warn("[🕸️ :#{node()}] ⏹️  reason: [" <> inspect(reason) <> "]")
+    Finitomata.transition(fsm, {:stop!, %{reason: reason}})
   end
-
-  @impl GenServer
-  @doc false
-  def handle_continue(:quorum, %Mon{} = state),
-    do: do_handle_quorum(Node.alive?(), state)
-
-  @spec do_handle_quorum(boolean(), state :: t()) ::
-          {:noreply, new_state} | {:noreply, new_state, {:continue, :quorum}}
-        when new_state: t()
-  @doc false
-  defp do_handle_quorum(true, %Mon{otp_app: otp_app} = state) do
-    case active_sentry(otp_app) do
-      [] ->
-        Process.sleep(@quorum_retry_interval)
-        {:noreply, state, {:continue, :quorum}}
-
-      [_ | _] = active_sentry ->
-        state = %Mon{
-          state
-          | alive?: true,
-            sentry?: Enum.member?(active_sentry, node()),
-            clustered?: true
-        }
-
-        state = update_group(:add, otp_app, node(), state)
-        {:noreply, notify(:joined, state)}
-    end
-  end
-
-  @doc false
-  defp do_handle_quorum(false, %Mon{} = state),
-    do: {:noreply, notify(:rehashing, %Mon{state | sentry?: true, clustered?: false})}
 
   ##############################################################################
 
@@ -222,270 +185,5 @@ defmodule Cloister.Monitor do
     state = %Mon{state | groups: []}
     state = Enum.reduce([node() | Node.list()], state, &register_node/2)
     {:noreply, state}
-  end
-
-  ##############################################################################
-
-  @spec update_state(state :: t()) :: t()
-  defp update_state(%Mon{} = state) do
-    state.ring
-    |> Ring.nodes()
-    |> do_update_state(state)
-  end
-
-  @spec do_update_state([node()] | {:error, :no_such_ring}, state :: t()) :: t()
-  defp do_update_state({:error, :no_such_ring}, %Mon{} = state),
-    do: state
-
-  defp do_update_state(ring, %Mon{} = state) when is_list(ring) do
-    nodes = [node() | Node.list()]
-
-    status =
-      case {ring -- nodes, nodes -- ring} do
-        {[], []} ->
-          :up
-
-        {[], to_ring} ->
-          Enum.each(to_ring, &register_node(&1, state))
-          :rehashing
-
-        {from_ring, []} ->
-          Enum.each(from_ring, &unregister_node(&1, state))
-          :rehashing
-
-        {from_ring, to_ring} ->
-          Enum.each(from_ring, &unregister_node(&1, state))
-          Enum.each(to_ring, &register_node(&1, state))
-          :panic
-      end
-
-    notify(status, state)
-  end
-
-  @spec notify(to :: status(), state :: t()) :: t()
-  defp notify(to, %{status: to} = state), do: reschedule(state)
-
-  defp notify(to, %{status: from} = state) do
-    state = %Mon{state | status: to}
-    Cloister.Modules.listener_module().on_state_change(from, state)
-    reschedule(state)
-  end
-
-  @spec reschedule(state :: t()) :: t()
-  defp reschedule(state) do
-    Process.send_after(self(), :update_node_list, @refresh_rate)
-    state
-  end
-
-  #############################################################################
-
-  @spec node_type :: node_type()
-  defp node_type do
-    case node() do
-      :nonode@nohost ->
-        :nonode
-
-      name ->
-        name
-        |> Atom.to_string()
-        |> String.split("@")
-        |> List.last()
-        |> String.contains?(".")
-        |> if(do: :longnames, else: :shortnames)
-    end
-  end
-
-  @spec node_restart({:ok, binary()} | {:skip, any()}, otp_app :: atom()) ::
-          {:ok, pid()} | {:error, term()}
-  defp node_restart({:skip, any}, _otp_app) do
-    Logger.warn("[🕸️ :#{node()}] skipping restart, expected host, got: [#{inspect(any)}].")
-    {:error, any}
-  end
-
-  defp node_restart({:ok, host}, otp_app) do
-    stopped = Node.stop()
-
-    Logger.info(
-      "[🕸️ :#{node()}] stopped: [#{inspect(stopped)}], starting as: [#{otp_app}@#{host}]."
-    )
-
-    Node.start(:"#{otp_app}@#{host}")
-  end
-
-  @spec net_kernel_magic(type :: node_type(), otp_app :: atom()) :: :ok
-  defp net_kernel_magic(:longnames, _otp_app),
-    do: :ok = :net_kernel.monitor_nodes(true, node_type: :all)
-
-  defp net_kernel_magic(type, otp_app) do
-    maybe_host =
-      with service when is_atom(service) <- Application.fetch_env!(:cloister, :sentry),
-           {:ok, s_ips} <- :inet_tcp.getaddrs(service),
-           {:ok, l_ips} <- :inet.getifaddrs() do
-        maybe_ips =
-          for {_, l_ip_info} <- l_ips,
-              l_ip_info_addr = l_ip_info[:addr],
-              ^l_ip_info_addr <- s_ips,
-              do: ip_addr_to_s(l_ip_info_addr)
-
-        case maybe_ips do
-          [] ->
-            Logger.warn("[🕸️ :#{node()}] IP could not be found, retrying.")
-            net_kernel_magic(type, otp_app)
-
-          [ip | _] ->
-            Logger.debug("[🕸️ :#{node()}] IP found: #{ip}")
-            {:ok, ip}
-        end
-      else
-        expected when expected == {:error, :nxdomain} or is_list(expected) ->
-          magic? = Application.get_env(:cloister, :magic?, true)
-
-          case {magic?, :inet.getifaddrs()} do
-            {false, _} -> {:skip, :magic_disabled_in_config}
-            {_, {:ok, ip_addrs}} when is_list(ip_addrs) -> pick_up_addr(ip_addrs)
-            _ -> :inet.gethostname()
-          end
-
-        other ->
-          {:skip, other}
-      end
-
-    node_restart(maybe_host, otp_app)
-    net_kernel_magic(:longnames, otp_app)
-  end
-
-  @spec active_sentry(otp_app :: atom()) :: [node()]
-  defp active_sentry(otp_app) do
-    case Application.get_env(:cloister, :sentry, [node()]) do
-      service when is_atom(service) ->
-        case :inet_tcp.getaddrs(service) do
-          {:ok, ip_list} ->
-            for {_, _, _, _} = ip4_addr <- ip_list,
-                sentry = :"#{otp_app}@#{ip_addr_to_s(ip4_addr)}",
-                node() == sentry or Node.connect(sentry),
-                do: sentry
-
-          {:error, :nxdomain} ->
-            Logger.warn("[🕸️ :#{node()}] Service not found: #{inspect(service)}.")
-
-            case Cloister.Application.consensus() do
-              1 -> [node()]
-              _ -> []
-            end
-
-          {:error, reason} ->
-            Logger.warn("[🕸️ #{inspect(service)}] :#{node()} ❓: #{inspect(reason)}.")
-            []
-        end
-
-      [_ | _] = node_list ->
-        for sentry <- node_list,
-            node() == sentry or Node.connect(sentry),
-            do: sentry
-    end
-  end
-
-  defp loopback?, do: Application.get_env(:cloister, :loopback?, false)
-
-  @spec ip_addr_to_s(:inet.ip4_address()) :: binary()
-  defp ip_addr_to_s({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
-
-  @spec pick_up_addr([{[binary()], [any()]}]) :: {:ok, binary()} | {:skip, any()}
-  defp pick_up_addr(addrs) do
-    loopback = if loopback?(), do: loopback(addrs)
-
-    case loopback || point_to_point(addrs) || broadcast(addrs) do
-      addr when is_binary(addr) -> {:ok, addr}
-      _other -> {:skip, {:unfit, addrs}}
-    end
-  end
-
-  # second type http://erlang.org/doc/man/inet.html#type-getifaddrs_ifopts
-  @spec loopback([{binary(), any()}]) :: binary() | nil
-  defp loopback(addrs) do
-    case Enum.filter(addrs, fn {_, addr} -> :loopback in addr[:flags] end) do
-      [] -> nil
-      [{_, addr}] -> ip_addr_to_s(addr[:addr])
-      _many -> with {:ok, host} <- :inet.gethostname(), do: host
-    end
-  end
-
-  # second type http://erlang.org/doc/man/inet.html#type-getifaddrs_ifopts
-  @spec point_to_point([{binary(), any()}]) :: binary() | nil
-  defp point_to_point(addrs) do
-    case Enum.filter(addrs, fn {_, addr} -> :pointtopoint in addr[:flags] end) do
-      [] -> nil
-      [{_, addr}] -> ip_addr_to_s(addr[:addr])
-      _many -> with {:ok, host} <- :inet.gethostname(), do: host
-    end
-  end
-
-  # second type http://erlang.org/doc/man/inet.html#type-getifaddrs_ifopts
-  @spec broadcast([{binary(), any()}]) :: binary()
-  defp broadcast(addrs) do
-    case Enum.filter(addrs, fn {_, addr} -> :broadcast in addr[:flags] end) do
-      [{_, addr}] -> ip_addr_to_s(addr[:addr])
-      _any -> with {:ok, host} <- :inet.gethostname(), do: host
-    end
-  end
-
-  @spec update_group(:add | :remove, group :: atom(), who :: node(), state :: t()) :: t()
-  defp update_group(:add, group, who, %Mon{groups: groups, status: :up} = state) do
-    groups = Keyword.update(groups, group, [who], &Enum.uniq([who | &1]))
-    %Mon{state | groups: groups}
-  end
-
-  defp update_group(:remove, group, who, %Mon{groups: groups, status: :up} = state) do
-    groups = Keyword.update!(groups, group, &List.delete(&1, who))
-    %Mon{state | groups: groups}
-  end
-
-  defp update_group(_, _, _, state), do: state
-
-  @spec register_node(node :: node(), state :: t()) :: t()
-  defp register_node(node, %Mon{otp_app: otp_app, ring: ring, status: :up} = state) do
-    if node == node() do
-      Logger.info("[🕸️ :#{node()}] ⏹️  self [#{node}] has been registered")
-      Ring.add_node(ring, node)
-      update_group(:add, otp_app, node, state)
-    else
-      case :rpc.call(node, Cloister, :ring, [], @rpc_timeout) do
-        {:badrpc, reason} ->
-          Logger.warn(
-            "[🕸️ :#{node()}] ⏹️  attempt to call node [#{node}] failed with [#{inspect(reason)}]"
-          )
-
-          state
-
-        ^otp_app ->
-          Logger.info("[🕸️ :#{node()}] ⏹️  sibling node [#{node}] has been registered")
-          Ring.add_node(ring, node)
-          update_group(:add, otp_app, node, state)
-
-        name ->
-          Logger.info("[🕸️ :#{node()}] ⏹️  cousin node [#{node}] has been registered")
-          update_group(:add, name, node, state)
-      end
-    end
-  end
-
-  # this (empty groups) happens only during Phase I
-  defp register_node(node, %Mon{ring: ring, groups: []} = state) do
-    Ring.add_node(ring, node)
-    state
-  end
-
-  defp register_node(_node, %Mon{} = state), do: state
-
-  @spec unregister_node(node :: node(), state :: t()) :: t()
-  defp unregister_node(node, %Mon{groups: groups, ring: ring} = state) do
-    Enum.reduce_while(groups, state, fn {group, nodes}, state ->
-      if Enum.member?(nodes, node) do
-        Ring.remove_node(ring, node)
-        {:halt, update_group(:remove, group, node, state)}
-      else
-        {:cont, state}
-      end
-    end)
   end
 end
