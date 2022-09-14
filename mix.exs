@@ -49,6 +49,7 @@ defmodule Cloister.MixProject do
   defp deps do
     [
       {:libring, "~> 1.0"},
+      {:finitomata, "~> 0.7"},
       {:boundary, "~> 0.4", runtime: false},
       {:nimble_options, "~> 0.2"},
       # dev / test

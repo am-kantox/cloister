@@ -8,8 +8,6 @@ defmodule Cloister.Monitor do
 
   use Boundary, deps: [Cloister.Modules], exports: []
 
-  alias HashRing.Managed, as: Ring
-
   require Logger
 
   @typedoc "Statuses the node running the code might be in regard to cloister"
@@ -25,7 +23,7 @@ defmodule Cloister.Monitor do
   @type t :: %{
           __struct__: Cloister.Monitor,
           otp_app: atom(),
-          groups: [group()],
+          consensus: pos_integer(),
           listener: module(),
           started_at: DateTime.t(),
           alive?: boolean(),
@@ -35,7 +33,7 @@ defmodule Cloister.Monitor do
         }
 
   defstruct otp_app: :cloister,
-            groups: [],
+            consensus: 1,
             listener: nil,
             started_at: nil,
             alive?: false,
@@ -46,16 +44,7 @@ defmodule Cloister.Monitor do
   alias Cloister.Monitor, as: Mon
 
   # millis
-  @refresh_rate 300
-
-  # millis
-  @rpc_timeout 5_000
-
-  # millis
   @nodes_delay 1_000
-
-  # millis
-  @quorum_retry_interval 100
 
   @doc """
   Used to start `Cloister.Monitor`.
@@ -89,10 +78,11 @@ defmodule Cloister.Monitor do
       state
       |> Keyword.put_new_lazy(:otp_app, otp_app)
       |> Keyword.put_new(:listener, Cloister.Modules.listener_module())
+      |> Keyword.put_new(:consensus, Application.get_env(:cloister, :consensus))
 
     fsm_name = "monitor_#{state[:otp_app]}"
 
-    Finitomata.start_fsm(Cloister.Monitor.Fsm, fsm_name)
+    Finitomata.start_fsm(Cloister.Monitor.Fsm, fsm_name, struct!(Mon, state))
 
     {:ok, %{fsm: fsm_name}}
   end
@@ -117,8 +107,8 @@ defmodule Cloister.Monitor do
   @doc false
   @spec siblings! :: [node()] | {:error, :no_such_ring}
   def siblings! do
-    %Mon{otp_app: otp_app, groups: groups} = nodes!()
-    groups[otp_app] || Cloister.Modules.info_module().nodes()
+    %Mon{ring: ring} = nodes!()
+    HashRing.Managed.nodes(ring)
   end
 
   @spec nodes!(timeout :: non_neg_integer()) :: t()
@@ -133,57 +123,17 @@ defmodule Cloister.Monitor do
 
   @impl GenServer
   @doc false
-  def handle_info(:update_node_list, state) do
-    # Logger.debug("[🕸️ :#{node()}] 🔄 state: [" <> inspect(state) <> "]")
-    {:noreply, update_state(state)}
-  end
-
-  @impl GenServer
-  @doc false
-  def handle_info({:nodeup, node, info}, state) do
-    Logger.info(
-      "[🕸️ :#{node()}] #{node} ⬆️: [" <> inspect(info) <> "], state: [" <> inspect(state) <> "]"
-    )
-
-    {:noreply, update_state(state)}
-  end
-
-  @impl GenServer
-  @doc false
-  def handle_info({:nodedown, node, info}, state) do
-    Logger.info(
-      "[🕸️ :#{node()}] #{node} ⬇️ info: [" <>
-        inspect(info) <> "], state: [" <> inspect(state) <> "]"
-    )
-
-    {:noreply, update_state(state)}
-  end
-
-  ##############################################################################
-
-  @impl GenServer
-  @doc false
   def handle_call(:state, _from, state), do: {:reply, state, state}
 
   @impl GenServer
   @doc false
-  def handle_call(:siblings, _from, %Mon{otp_app: otp_app, groups: groups} = state),
-    do: {:reply, groups[otp_app], state}
+  def handle_call(:siblings, _from, %Mon{} = state),
+    do: {:reply, siblings!(), state}
 
   @impl GenServer
   @doc false
   def handle_call(:nodes!, _from, state) do
-    state = update_state(state)
+    # [AM] state = update_state(state)
     {:reply, state, state}
-  end
-
-  @impl GenServer
-  @doc false
-  def handle_cast({:update_groups, _args}, %Mon{} = state) do
-    Enum.each(Ring.nodes(state.ring), &Ring.remove_node(state.ring, &1))
-
-    state = %Mon{state | groups: []}
-    state = Enum.reduce([node() | Node.list()], state, &register_node/2)
-    {:noreply, state}
   end
 end

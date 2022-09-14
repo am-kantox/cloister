@@ -1,17 +1,25 @@
 defmodule Cloister.Monitor.Fsm do
   @moduledoc false
+
   alias Cloister.Monitor, as: Mon
+  alias HashRing.Managed, as: Ring
 
   @fsm """
-  down --> |rehash!| rehashing
-  rehashing --> |up| ready
+  down --> |quorum!| assembling
+  assembling --> |rehash| rehashing
+  rehashing --> |nonode| nonode
   rehashing --> |rehash| rehashing
-  rehashing --> |down| stopping
+  rehashing --> |up| rehashing
+  rehashing --> |up| ready
+  rehashing --> |down| rehashing
   rehashing --> |stop!| stopping
+  ready --> |nonode| nonode
+  ready --> |rehash| ready
   ready --> |up| ready
   ready --> |down| ready
   ready --> |down| rehashing
   ready --> |stop!| stopping
+  nonode --> |rehash| assembling
   stopping --> |stop!| stopped
   """
 
@@ -19,16 +27,24 @@ defmodule Cloister.Monitor.Fsm do
 
   use Finitomata, fsm: @fsm, auto_terminate: true, timer: 1_000
 
+  @typep t :: Mon.t()
+
   @impl Finitomata
-  def on_timer(:rehashing, %Mon{} = state) do
-    event = update_state(state)
+  def on_timer(:assembling, %Mon{} = state) do
+    assembly_quorum(Node.alive?(), state)
+  end
+
+  @impl Finitomata
+  def on_timer(current, %Mon{} = state) when current in ~w|rehashing ready|a do
+    state.ring
+    |> Ring.nodes()
+    |> update_state(state)
   end
 
   @impl Finitomata
   def on_transition(:*, :__start__, _, %Mon{} = state) do
     ring = if is_nil(state.ring), do: Ring.new(state.otp_app), else: state.ring
     net_kernel_magic(node_type(), state.otp_app)
-
     {:ok, :down, %Mon{state | ring: ring}}
   end
 
@@ -37,49 +53,47 @@ defmodule Cloister.Monitor.Fsm do
     Cloister.Modules.listener_module().on_state_change(from, state)
   end
 
-  @spec update_state(state :: t()) :: t()
-  defp update_state(%Mon{} = state) do
-    state.ring
-    |> Ring.nodes()
-    |> do_update_state(state)
-  end
+  @spec update_state([node()] | {:error, :no_such_ring}, state :: t()) :: t()
+  defp update_state({:error, :no_such_ring}, %Mon{} = state),
+    do: {:transition, :nonode, state}
 
-  @spec do_update_state([node()] | {:error, :no_such_ring}, state :: t()) :: t()
-  defp do_update_state({:error, :no_such_ring}, %Mon{} = state),
-    do: state
-
-  defp do_update_state(ring, %Mon{} = state) when is_list(ring) do
+  defp update_state(ring, %Mon{} = state) when is_list(ring) do
     nodes = [node() | Node.list()]
 
-    event =
-      case {ring -- nodes, nodes -- ring} do
-        {[], []} ->
-          :up
+    {ring -- nodes, nodes -- ring}
+    |> case do
+      {[], []} ->
+        :ok
 
-        {[], to_ring} ->
-          Enum.each(to_ring, &register_node(&1, state))
-          :rehashing
+      {[], to_ring} ->
+        Enum.each(to_ring, &Ring.add_node(state.ring, &1))
+        {:transition, :up, state}
 
-        {from_ring, []} ->
-          Enum.each(from_ring, &unregister_node(&1, state))
-          :rehashing
+      {from_ring, []} ->
+        Enum.each(from_ring, &Ring.remove_node(state.ring, &1))
+        {:transition, :down, state}
 
-        {from_ring, to_ring} ->
-          Enum.each(from_ring, &unregister_node(&1, state))
-          Enum.each(to_ring, &register_node(&1, state))
-          :panic
-      end
+      {from_ring, to_ring} ->
+        Enum.each(from_ring, &Ring.remove_node(state.ring, &1))
+        Enum.each(to_ring, &Ring.add_node(state.ring, &1))
+
+        event =
+          case length(from_ring) - length(to_ring) do
+            0 -> :rehash
+            neg when neg < 0 -> :down
+            pos when pos > 0 -> :up
+          end
+
+        {:transition, event, state}
+    end
   end
 
-  @spec do_handle_quorum(boolean(), state :: t()) ::
-          {:noreply, new_state} | {:noreply, new_state, {:continue, :quorum}}
-        when new_state: t()
+  @spec assembly_quorum(boolean(), state :: t()) :: :ok | {:transition, state(), t()}
   @doc false
-  defp do_handle_quorum(true, %Mon{otp_app: otp_app} = state) do
-    case active_sentry(otp_app) do
+  defp assembly_quorum(true, %Mon{otp_app: otp_app, consensus: consensus} = state) do
+    case active_sentry(otp_app, consensus) do
       [] ->
-        Process.sleep(@quorum_retry_interval)
-        {:noreply, state, {:continue, :quorum}}
+        :ok
 
       [_ | _] = active_sentry ->
         state = %Mon{
@@ -89,17 +103,16 @@ defmodule Cloister.Monitor.Fsm do
             clustered?: true
         }
 
-        state = update_group(:add, otp_app, node(), state)
-        {:noreply, notify(:joined, state)}
+        {:transition, :rehash, state}
     end
   end
 
   @doc false
-  defp do_handle_quorum(false, %Mon{} = state),
-    do: {:noreply, %Mon{state | sentry?: true, clustered?: false}}
+  defp assembly_quorum(false, %Mon{} = state),
+    do: {:transition, :rehash, %Mon{state | sentry?: true, clustered?: false}}
 
-  @spec active_sentry(otp_app :: atom()) :: [node()]
-  defp active_sentry(otp_app) do
+  @spec active_sentry(otp_app :: atom(), consensus :: pos_integer()) :: [node()]
+  defp active_sentry(otp_app, consensus) do
     case Application.get_env(:cloister, :sentry, [node()]) do
       service when is_atom(service) ->
         case :inet_tcp.getaddrs(service) do
@@ -112,7 +125,7 @@ defmodule Cloister.Monitor.Fsm do
           {:error, :nxdomain} ->
             Logger.warn("[🕸️ :#{node()}] Service not found: #{inspect(service)}.")
 
-            case Cloister.Application.consensus() do
+            case consensus do
               1 -> [node()]
               _ -> []
             end
@@ -129,7 +142,7 @@ defmodule Cloister.Monitor.Fsm do
     end
   end
 
-  @spec net_kernel_magic(type :: node_type(), otp_app :: atom()) :: :ok
+  @spec net_kernel_magic(type :: Mon.node_type(), otp_app :: atom()) :: :ok
   defp net_kernel_magic(:longnames, _otp_app),
     do: :ok = :net_kernel.monitor_nodes(true, node_type: :all)
 
@@ -232,7 +245,7 @@ defmodule Cloister.Monitor.Fsm do
     Node.start(:"#{otp_app}@#{host}")
   end
 
-  @spec node_type :: node_type()
+  @spec node_type :: Mon.node_type()
   defp node_type do
     case node() do
       :nonode@nohost ->
@@ -248,50 +261,30 @@ defmodule Cloister.Monitor.Fsm do
     end
   end
 
-  @spec register_node(node :: node(), state :: t()) :: t()
-  defp register_node(node, %Mon{otp_app: otp_app, ring: ring} = state) do
-    if node == node() do
-      Logger.info("[🕸️ :#{node()}] ⏹️  self [#{node}] has been registered")
-      Ring.add_node(ring, node)
-      update_group(:add, otp_app, node, state)
-    else
-      case :rpc.call(node, Cloister, :ring, [], @rpc_timeout) do
-        {:badrpc, reason} ->
-          Logger.warn(
-            "[🕸️ :#{node()}] ⏹️  attempt to call node [#{node}] failed with [#{inspect(reason)}]"
-          )
+  # @spec register_node(node :: node(), state :: t()) :: t()
+  # defp register_node(node, %Mon{otp_app: otp_app, ring: ring} = state) do
+  #   if node == node() do
+  #     Logger.info("[🕸️ :#{node()}] ⏹️  self [#{node}] has been registered")
+  #     Ring.add_node(ring, node)
+  #     update_group(:add, otp_app, node, state)
+  #   else
+  #     case :rpc.call(node, Cloister, :ring, [], @rpc_timeout) do
+  #       {:badrpc, reason} ->
+  #         Logger.warn(
+  #           "[🕸️ :#{node()}] ⏹️  attempt to call node [#{node}] failed with [#{inspect(reason)}]"
+  #         )
 
-          state
+  #         state
 
-        ^otp_app ->
-          Logger.info("[🕸️ :#{node()}] ⏹️  sibling node [#{node}] has been registered")
-          Ring.add_node(ring, node)
-          update_group(:add, otp_app, node, state)
+  #       ^otp_app ->
+  #         Logger.info("[🕸️ :#{node()}] ⏹️  sibling node [#{node}] has been registered")
+  #         Ring.add_node(ring, node)
+  #         update_group(:add, otp_app, node, state)
 
-        name ->
-          Logger.info("[🕸️ :#{node()}] ⏹️  cousin node [#{node}] has been registered")
-          update_group(:add, name, node, state)
-      end
-    end
-  end
-
-  # this (empty groups) happens only during Phase I
-  defp register_node(node, %Mon{ring: ring, groups: []} = state) do
-    Ring.add_node(ring, node)
-    state
-  end
-
-  defp register_node(_node, %Mon{} = state), do: state
-
-  @spec unregister_node(node :: node(), state :: t()) :: t()
-  defp unregister_node(node, %Mon{groups: groups, ring: ring} = state) do
-    Enum.reduce_while(groups, state, fn {group, nodes}, state ->
-      if Enum.member?(nodes, node) do
-        Ring.remove_node(ring, node)
-        {:halt, update_group(:remove, group, node, state)}
-      else
-        {:cont, state}
-      end
-    end)
-  end
+  #       name ->
+  #         Logger.info("[🕸️ :#{node()}] ⏹️  cousin node [#{node}] has been registered")
+  #         update_group(:add, name, node, state)
+  #     end
+  #   end
+  # end
 end
