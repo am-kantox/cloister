@@ -13,12 +13,6 @@ defmodule Cloister.Monitor do
   alias Cloister.Monitor, as: Mon
   alias HashRing.Managed, as: Ring
 
-  @typedoc "Statuses the node running the code might be in regard to cloister"
-  @type status :: :down | :starting | :joined | :up | :stopping | :rehashing | :panic
-
-  @typedoc "Group of nodes sharing the same hashring"
-  @type group :: {atom(), [node()]}
-
   @typedoc "Type of the node as it has been started"
   @type node_type :: :longnames | :shortnames | :nonode
 
@@ -164,6 +158,7 @@ defmodule Cloister.Monitor do
   @impl GenServer
   @doc false
   def handle_call(:nodes!, _from, state) do
+    # [AM] inner transition to update list?
     {:reply, Finitomata.state(state.fsm).payload, state}
   end
 end
