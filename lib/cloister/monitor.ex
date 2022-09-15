@@ -75,10 +75,12 @@ defmodule Cloister.Monitor do
 
     ring =
       case Ring.nodes(state[:ring]) do
-        nodes when is_list(nodes) -> state[:ring]
-      {:error, :no_such_ring} ->
-        {:ok, _ring} = Ring.new(otp_app)
-        otp_app
+        nodes when is_list(nodes) ->
+          state[:ring]
+
+        {:error, :no_such_ring} ->
+          {:ok, _ring} = Ring.new(otp_app)
+          otp_app
       end
 
     state =

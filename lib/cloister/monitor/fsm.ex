@@ -62,11 +62,15 @@ defmodule Cloister.Monitor.Fsm do
   end
 
   @impl Finitomata
-  def on_enter(_entering, %Finitomata.State{history: [from | _], payload: %Mon{listener: listener} = state}) do
+  def on_enter(_entering, %Finitomata.State{
+        history: [from | _],
+        payload: %Mon{listener: listener} = state
+      }) do
     listener.on_state_change(from, state)
   end
 
-  @spec update_state([node()] | {:error, :no_such_ring}, state :: t()) :: t()
+  @spec update_state([node()] | {:error, :no_such_ring}, state :: t()) ::
+          :ok | {:transiiton, :nonode | :rehash, t()}
   defp update_state({:error, :no_such_ring}, %Mon{} = state),
     do: {:transition, :nonode, state}
 

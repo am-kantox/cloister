@@ -2,7 +2,7 @@ defmodule Cloister.MixProject do
   use Mix.Project
 
   @app :cloister
-  @version "0.11.0"
+  @version "0.12.0"
 
   def project do
     [

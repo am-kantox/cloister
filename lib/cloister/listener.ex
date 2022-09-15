@@ -10,7 +10,7 @@ defmodule Cloister.Listener do
   Listeners are obliged to handle `:up`, `:rehashing` and `:stopping` events.
   """
   @callback on_state_change(
-              from :: Cloister.Monitor.status(),
+              from :: Cloister.Monitor.Fsm.state(),
               state :: Cloister.Monitor.t()
             ) :: :ok
 end
