@@ -82,14 +82,13 @@ defmodule Cloister.Modules do
               @impl Cloister.Listener
               def on_state_change(from, state) do
                 Logger.debug(
-                  "[🕸️ #{inspect(unquote(ring))} :#{node()}] 🔄 from: :#{from}, state: " <>
+                  "[🕸️ " <> inspect(unquote(ring)) <> ":#{node()}] 🔄 from: " <> inspect(from) <> ", state: " <>
                     inspect(state)
                 )
               end
             end
 
           Module.create(name, ast, Macro.Env.location(__ENV__))
-          Application.put_env(:cloister, :listener, name, persistent: true)
           name
       end
     end

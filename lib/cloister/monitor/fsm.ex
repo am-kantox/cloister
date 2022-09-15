@@ -27,20 +27,20 @@ defmodule Cloister.Monitor.Fsm do
   @typep t :: Mon.t()
 
   @impl Finitomata
-  def on_timer(:assembling, %State{payload: %Mon{} = mon} = state) do
+  def on_timer(:assembling, %State{payload: %Mon{} = mon}) do
     Node.alive?()
     |> assembly_quorum(mon)
     |> case do
       :wait -> :ok
-      %Mon{} = mon -> {:transition, :assembled, %State{state | payload: mon}}
+      %Mon{} = mon -> {:transition, :assembled, mon}
     end
   end
 
   @impl Finitomata
-  def on_timer(current, %State{payload: %Mon{} = state}) when current in ~w|rehashing ready|a do
-    state.ring
+  def on_timer(current, %State{payload: %Mon{} = mon}) when current in ~w|rehashing ready|a do
+    mon.ring
     |> Ring.nodes()
-    |> update_state(state)
+    |> update_state(mon)
   end
 
   @impl Finitomata
@@ -62,8 +62,8 @@ defmodule Cloister.Monitor.Fsm do
   end
 
   @impl Finitomata
-  def on_enter(_entering, %Finitomata.State{history: [from | _], payload: state}) do
-    Cloister.Modules.listener_module().on_state_change(from, state)
+  def on_enter(_entering, %Finitomata.State{history: [from | _], payload: %Mon{listener: listener} = state}) do
+    listener.on_state_change(from, state)
   end
 
   @spec update_state([node()] | {:error, :no_such_ring}, state :: t()) :: t()
@@ -102,7 +102,7 @@ defmodule Cloister.Monitor.Fsm do
 
   @doc false
   defp assembly_quorum(false, %Mon{} = state),
-    do: %Mon{state | sentry?: true, clustered?: false}
+    do: %Mon{state | alive?: true, sentry?: true, clustered?: false}
 
   @spec active_sentry(otp_app :: atom(), consensus :: pos_integer()) :: [node()]
   defp active_sentry(otp_app, consensus) do

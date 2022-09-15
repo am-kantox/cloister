@@ -80,16 +80,19 @@ defmodule Cloister.Monitor do
     otp_app = Keyword.get_lazy(state, :otp_app, fn -> Keyword.get(state, :otp_app, :cloister) end)
 
     ring =
-      with nil <- state[:ring],
-           {:ok, ring} = Ring.new(otp_app),
-           do: ring,
-           else: (_ -> state[:ring])
+      case Ring.nodes(state[:ring]) do
+        nodes when is_list(nodes) -> state[:ring]
+      {:error, :no_such_ring} ->
+        {:ok, _ring} = Ring.new(otp_app)
+        otp_app
+      end
 
     state =
       state
       |> Keyword.put_new(:otp_app, otp_app)
       |> Keyword.put_new(:ring, ring)
       |> Keyword.put_new(:listener, Cloister.Modules.listener_module())
+      |> Keyword.put_new(:started_at, DateTime.utc_now())
       |> Keyword.put_new(:consensus, Application.get_env(:cloister, :consensus))
 
     fsm_name = "monitor_#{state[:otp_app]}"
@@ -118,19 +121,19 @@ defmodule Cloister.Monitor do
 
     Finitomata.transition(state.fsm, {:rehash, nil})
 
-    {:noreply, state}
+    {:noreply, %{state | groups: Ring.nodes(state.ring)}}
   end
 
   @impl GenServer
   @doc false
   def handle_info(:monitor_nodes, state) do
-    :net_kernel.monitor_nodes(true, node_type: :all)
+    :net_kernel.monitor_nodes(true, node_type: :visible)
     {:noreply, state}
   end
 
-  @spec state :: monitor()
+  @spec state(module()) :: monitor()
   @doc "Returns an internal state of the Node"
-  def state, do: __MODULE__ |> GenServer.call(:state) |> Map.put(:groups, siblings!())
+  def state(name \\ __MODULE__), do: GenServer.call(name, :state)
 
   @spec siblings :: [node()]
   @doc "Returns the nodes in the cluster that are connected to this one in the same group"
