@@ -66,13 +66,7 @@ defmodule Cloister.Monitor do
   @impl GenServer
   @doc false
   def init(state) do
-    otp_app = fn ->
-      Keyword.get(state, :otp_app) ||
-        case Application.loaded_applications() do
-          [{top_app, _, _} | _] -> top_app
-          _ -> :closter
-        end
-    end
+    otp_app = fn -> Keyword.get(state, :otp_app, :cloister) end
 
     state =
       state

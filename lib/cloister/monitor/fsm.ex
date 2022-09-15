@@ -2,22 +2,19 @@ defmodule Cloister.Monitor.Fsm do
   @moduledoc false
 
   alias Cloister.Monitor, as: Mon
+  alias Finitomata.State, as: State
   alias HashRing.Managed, as: Ring
 
   @fsm """
   down --> |quorum!| assembling
-  assembling --> |rehash| rehashing
+  assembling --> |assembled| rehashing
   rehashing --> |nonode| nonode
   rehashing --> |rehash| rehashing
-  rehashing --> |up| rehashing
-  rehashing --> |up| ready
-  rehashing --> |down| rehashing
+  rehashing --> |rehash| ready
   rehashing --> |stop!| stopping
   ready --> |nonode| nonode
   ready --> |rehash| ready
-  ready --> |up| ready
-  ready --> |down| ready
-  ready --> |down| rehashing
+  ready --> |rehash| rehashing
   ready --> |stop!| stopping
   nonode --> |rehash| assembling
   stopping --> |stop!| stopped
@@ -30,12 +27,17 @@ defmodule Cloister.Monitor.Fsm do
   @typep t :: Mon.t()
 
   @impl Finitomata
-  def on_timer(:assembling, %Mon{} = state) do
-    assembly_quorum(Node.alive?(), state)
+  def on_timer(:assembling, %State{payload: %Mon{} = mon} = state) do
+    Node.alive?()
+    |> assembly_quorum(mon)
+    |> case do
+      :wait -> :ok
+      %Mon{} = mon -> {:transition, :assembled, %State{state | payload: mon}}
+    end
   end
 
   @impl Finitomata
-  def on_timer(current, %Mon{} = state) when current in ~w|rehashing ready|a do
+  def on_timer(current, %State{payload: %Mon{} = state}) when current in ~w|rehashing ready|a do
     state.ring
     |> Ring.nodes()
     |> update_state(state)
@@ -43,9 +45,26 @@ defmodule Cloister.Monitor.Fsm do
 
   @impl Finitomata
   def on_transition(:*, :__start__, _, %Mon{} = state) do
-    ring = if is_nil(state.ring), do: Ring.new(state.otp_app), else: state.ring
+    ring =
+      with nil <- state.ring,
+           {:ok, ring} = Ring.new(state.otp_app),
+           do: ring,
+           else: (_ -> state.ring)
+
     net_kernel_magic(node_type(), state.otp_app)
     {:ok, :down, %Mon{state | ring: ring}}
+  end
+
+  @impl Finitomata
+  def on_transition(current, :rehash, _, %Mon{ring: ring} = state) do
+    goto =
+      case length([node() | Node.list()]) - length(Ring.nodes(ring)) do
+        0 -> current
+        neg when neg < 0 -> :rehashing
+        pos when pos > 0 -> :ready
+      end
+
+    {:ok, goto, state}
   end
 
   @impl Finitomata
@@ -58,58 +77,38 @@ defmodule Cloister.Monitor.Fsm do
     do: {:transition, :nonode, state}
 
   defp update_state(ring, %Mon{} = state) when is_list(ring) do
-    nodes = [node() | Node.list()]
+    nodes = MapSet.new([node() | Node.list()])
+    ring = MapSet.new(ring)
 
-    {ring -- nodes, nodes -- ring}
-    |> case do
-      {[], []} ->
-        :ok
-
-      {[], to_ring} ->
-        Enum.each(to_ring, &Ring.add_node(state.ring, &1))
-        {:transition, :up, state}
-
-      {from_ring, []} ->
-        Enum.each(from_ring, &Ring.remove_node(state.ring, &1))
-        {:transition, :down, state}
-
-      {from_ring, to_ring} ->
-        Enum.each(from_ring, &Ring.remove_node(state.ring, &1))
-        Enum.each(to_ring, &Ring.add_node(state.ring, &1))
-
-        event =
-          case length(from_ring) - length(to_ring) do
-            0 -> :rehash
-            neg when neg < 0 -> :down
-            pos when pos > 0 -> :up
-          end
-
-        {:transition, event, state}
+    if MapSet.equal?(nodes, ring) do
+      :ok
+    else
+      nodes |> MapSet.difference(ring) |> Enum.each(&Ring.add_node(state.ring, &1))
+      ring |> MapSet.difference(nodes) |> Enum.each(&Ring.remove_node(state.ring, &1))
+      {:transition, :rehash, state}
     end
   end
 
-  @spec assembly_quorum(boolean(), state :: t()) :: :ok | {:transition, state(), t()}
+  @spec assembly_quorum(boolean(), state :: t()) :: :wait | t()
   @doc false
   defp assembly_quorum(true, %Mon{otp_app: otp_app, consensus: consensus} = state) do
     case active_sentry(otp_app, consensus) do
       [] ->
-        :ok
+        :wait
 
       [_ | _] = active_sentry ->
-        state = %Mon{
+        %Mon{
           state
           | alive?: true,
             sentry?: Enum.member?(active_sentry, node()),
             clustered?: true
         }
-
-        {:transition, :rehash, state}
     end
   end
 
   @doc false
   defp assembly_quorum(false, %Mon{} = state),
-    do: {:transition, :rehash, %Mon{state | sentry?: true, clustered?: false}}
+    do: %Mon{state | sentry?: true, clustered?: false}
 
   @spec active_sentry(otp_app :: atom(), consensus :: pos_integer()) :: [node()]
   defp active_sentry(otp_app, consensus) do
@@ -260,31 +259,4 @@ defmodule Cloister.Monitor.Fsm do
         |> if(do: :longnames, else: :shortnames)
     end
   end
-
-  # @spec register_node(node :: node(), state :: t()) :: t()
-  # defp register_node(node, %Mon{otp_app: otp_app, ring: ring} = state) do
-  #   if node == node() do
-  #     Logger.info("[🕸️ :#{node()}] ⏹️  self [#{node}] has been registered")
-  #     Ring.add_node(ring, node)
-  #     update_group(:add, otp_app, node, state)
-  #   else
-  #     case :rpc.call(node, Cloister, :ring, [], @rpc_timeout) do
-  #       {:badrpc, reason} ->
-  #         Logger.warn(
-  #           "[🕸️ :#{node()}] ⏹️  attempt to call node [#{node}] failed with [#{inspect(reason)}]"
-  #         )
-
-  #         state
-
-  #       ^otp_app ->
-  #         Logger.info("[🕸️ :#{node()}] ⏹️  sibling node [#{node}] has been registered")
-  #         Ring.add_node(ring, node)
-  #         update_group(:add, otp_app, node, state)
-
-  #       name ->
-  #         Logger.info("[🕸️ :#{node()}] ⏹️  cousin node [#{node}] has been registered")
-  #         update_group(:add, name, node, state)
-  #     end
-  #   end
-  # end
 end

@@ -27,8 +27,8 @@ defmodule Cloister.Application do
   end
 
   @impl Application
-  def prep_stop(_state),
-    do: Cloister.Monitor.terminate({:shutdown, :application}, Cloister.Monitor.state())
+  def prep_stop(state),
+    do: Cloister.Monitor.terminate({:shutdown, :application}, state)
 
   @impl Application
   def start_phase(:warming_up, _start_type, phase_args) do
@@ -44,9 +44,9 @@ defmodule Cloister.Application do
   end
 
   @impl Application
-  def start_phase(:rehash_on_up, _start_type, phase_args) do
+  def start_phase(:rehash_on_up, _start_type, _phase_args) do
     Logger.info("[🕸️ :#{node()}] Cloister → Phase II. Updating groups.")
-    Cloister.Monitor.update_groups(phase_args)
+    # [AM] Cloister.Monitor.update_groups(phase_args)
     :ok
   end
 
