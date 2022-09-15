@@ -22,8 +22,6 @@ defmodule Cloister.Manager do
   @doc false
   @impl Supervisor
   def init(state) do
-    state = Keyword.put_new(state, :otp_app, Application.get_env(:cloister, :otp_app, :cloister))
-
     {monitor_opts, state} = Keyword.pop(state, :monitor_opts, [])
 
     {additional_modules, state} =

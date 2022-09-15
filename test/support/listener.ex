@@ -5,6 +5,6 @@ defmodule Cloister.Listener.Default do
   require Logger
 
   def on_state_change(from, state) do
-    Logger.debug("[🕸️ @:#{node()}] 🔄 from: :#{from}, state: " <> inspect(state))
+    Logger.debug("[🕸️ @:#{node()}] 🔄 from: " <> inspect(from) <> ", state: " <> inspect(state))
   end
 end
