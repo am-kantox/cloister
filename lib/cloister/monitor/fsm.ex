@@ -22,7 +22,7 @@ defmodule Cloister.Monitor.Fsm do
 
   use Boundary, deps: [Cloister.Monitor], exports: []
 
-  use Finitomata, fsm: @fsm, auto_terminate: true, timer: 1_000
+  use Finitomata, fsm: @fsm, auto_terminate: true, timer: 5_000
 
   @typep t :: Mon.t()
 
@@ -45,14 +45,8 @@ defmodule Cloister.Monitor.Fsm do
 
   @impl Finitomata
   def on_transition(:*, :__start__, _, %Mon{} = state) do
-    ring =
-      with nil <- state.ring,
-           {:ok, ring} = Ring.new(state.otp_app),
-           do: ring,
-           else: (_ -> state.ring)
-
-    net_kernel_magic(node_type(), state.otp_app)
-    {:ok, :down, %Mon{state | ring: ring}}
+    net_kernel_magic(node_type(), state.otp_app, state.monitor)
+    {:ok, :down, state}
   end
 
   @impl Finitomata
@@ -141,11 +135,11 @@ defmodule Cloister.Monitor.Fsm do
     end
   end
 
-  @spec net_kernel_magic(type :: Mon.node_type(), otp_app :: atom()) :: :ok
-  defp net_kernel_magic(:longnames, _otp_app),
-    do: :ok = :net_kernel.monitor_nodes(true, node_type: :all)
+  @spec net_kernel_magic(type :: Mon.node_type(), otp_app :: atom(), monitor :: module()) :: :ok
+  defp net_kernel_magic(:longnames, _otp_app, monitor),
+    do: send(monitor, :monitor_nodes)
 
-  defp net_kernel_magic(type, otp_app) do
+  defp net_kernel_magic(type, otp_app, monitor) do
     maybe_host =
       with service when is_atom(service) <- Application.fetch_env!(:cloister, :sentry),
            {:ok, s_ips} <- :inet_tcp.getaddrs(service),
@@ -159,7 +153,7 @@ defmodule Cloister.Monitor.Fsm do
         case maybe_ips do
           [] ->
             Logger.warn("[🕸️ :#{node()}] IP could not be found, retrying.")
-            net_kernel_magic(type, otp_app)
+            net_kernel_magic(type, otp_app, monitor)
 
           [ip | _] ->
             Logger.debug("[🕸️ :#{node()}] IP found: #{ip}")
@@ -180,7 +174,7 @@ defmodule Cloister.Monitor.Fsm do
       end
 
     node_restart(maybe_host, otp_app)
-    net_kernel_magic(:longnames, otp_app)
+    net_kernel_magic(:longnames, otp_app, monitor)
   end
 
   defp loopback?, do: Application.get_env(:cloister, :loopback?, false)
