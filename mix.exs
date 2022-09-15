@@ -8,7 +8,7 @@ defmodule Cloister.MixProject do
     [
       app: @app,
       version: @version,
-      elixir: "~> 1.9",
+      elixir: "~> 1.12",
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: compilers(Mix.env()),
       start_permanent: Mix.env() == :prod,
