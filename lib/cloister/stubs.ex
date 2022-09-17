@@ -8,109 +8,73 @@ defmodule Cloister.Modules do
   defmodule Stubs do
     @moduledoc false
 
-    @doc false
-    @spec create_info_module(ring :: term(), name :: module()) :: module()
-    def create_info_module(ring, name \\ Cloister.Monitor.Info) do
-      case Code.ensure_compiled(name) do
-        {:module, ^name} ->
-          name
+    defmodule Info do
+      @moduledoc false
 
-        _ ->
-          ast =
-            quote do
-              @moduledoc false
+      @ring Application.compile_env(:cloister, :otp_app, :cloister)
 
-              require Logger
+      require Logger
 
-              @spec whois(group :: atom(), term :: term(), retry? :: boolean()) ::
-                      {:ok, node()} | {:error, {:not_our_ring, atom()}}
-              def whois(group \\ nil, term, retry? \\ true)
+      @spec whois(group :: atom(), term :: term(), retry? :: boolean()) ::
+              {:ok, node()} | {:error, {:not_our_ring, atom()}}
+      def whois(group \\ nil, term, retry? \\ true)
 
-              def whois(nil, term, retry?), do: whois(unquote(ring), term, retry?)
+      def whois(nil, term, retry?), do: whois(@ring, term, retry?)
 
-              def whois(unquote(ring), term, retry?) do
-                case {retry?, HashRing.Managed.key_to_node(unquote(ring), term)} do
-                  {false, {:error, {:invalid_ring, :no_nodes}} = error} ->
-                    error
+      def whois(@ring, term, retry?) do
+        case {retry?, HashRing.Managed.key_to_node(@ring, term)} do
+          {false, {:error, {:invalid_ring, :no_nodes}} = error} ->
+            error
 
-                  {true, {:error, {:invalid_ring, :no_nodes}}} ->
-                    try do
-                      Cloister.Monitor.nodes!()
-                    catch
-                      :exit, _reason ->
-                        Logger.warn("Ring #{unquote(ring)} is not yet assembled, retrying.")
-                    end
+          {true, {:error, {:invalid_ring, :no_nodes}}} ->
+            Logger.warn("Ring #{@ring} is not yet assembled, retrying.")
+            Process.sleep(1_000)
+            whois(@ring, term, true)
 
-                    whois(unquote(ring), term, false)
-
-                  {_, node} ->
-                    {:ok, node}
-                end
-              end
-
-              def whois(ring, _, _), do: {:error, {:not_our_ring, ring}}
-
-              @spec nodes :: [node()] | {:error, :no_such_ring}
-              def nodes,
-                do: HashRing.Managed.nodes(unquote(ring))
-
-              @spec ring :: atom()
-              def ring, do: unquote(ring)
-            end
-
-          Module.create(name, ast, Macro.Env.location(__ENV__))
-          Application.put_env(:cloister, :monitor, name, persistent: true)
-          name
+          {_, node} ->
+            {:ok, node}
+        end
       end
+
+      def whois(ring, _, _), do: {:error, {:not_our_ring, ring}}
+
+      @spec nodes :: [node()] | {:error, :no_such_ring}
+      def nodes, do: HashRing.Managed.nodes(@ring)
+
+      @spec ring :: atom()
+      def ring, do: @ring
     end
 
-    @doc false
-    @spec create_listener_module(ring :: term(), name :: module()) :: module()
-    def create_listener_module(ring, name \\ Cloister.Listener.Default) do
-      case Code.ensure_compiled(name) do
-        {:module, ^name} ->
-          name
+    defmodule Listener do
+      @moduledoc false
 
-        _ ->
-          ast =
-            quote do
-              @moduledoc false
+      require Logger
 
-              @behaviour Cloister.Listener
-              require Logger
+      @behaviour Cloister.Listener
 
-              @impl Cloister.Listener
-              def on_state_change(from, state) do
-                Logger.debug(
-                  "[🕸️ " <>
-                    inspect(unquote(ring)) <>
-                    ":#{node()}] 🔄 from: " <>
-                    inspect(from) <>
-                    ", state: " <>
-                    inspect(state)
-                )
-              end
-            end
+      @ring Application.compile_env(:cloister, :otp_app, :cloister)
 
-          Module.create(name, ast, Macro.Env.location(__ENV__))
-          name
+      @impl Cloister.Listener
+      def on_state_change(from, state) do
+        Logger.debug(
+          "[🕸️ " <>
+            inspect(@ring) <>
+            ":#{node()}] 🔄 from: " <>
+            inspect(from) <>
+            ", state: " <>
+            inspect(state)
+        )
       end
     end
   end
 
   @compile {:inline, info_module: 0, listener_module: 0}
 
-  @cloister_env Application.get_all_env(:cloister)
-
-  @ring Keyword.get(@cloister_env, :ring, Application.compile_env(:cloister, :otp_app, :cloister))
-
-  @info_module Keyword.get_lazy(@cloister_env, :monitor, fn -> Stubs.create_info_module(@ring) end)
+  @info_module Application.compile_env(:cloister, :monitor, Cloister.Modules.Stubs.Info)
   @spec info_module :: module()
   def info_module, do: @info_module
 
-  @listener_module Keyword.get_lazy(@cloister_env, :listener, fn ->
-                     Stubs.create_listener_module(@ring)
-                   end)
+  @listener_module Application.compile_env(:cloister, :listener, Cloister.Modules.Stubs.Listener)
   @spec listener_module :: module()
   def listener_module, do: @listener_module
 end
