@@ -53,21 +53,25 @@ defmodule Cloister.Application do
   @spec consensus :: non_neg_integer()
   def consensus, do: Application.get_env(:cloister, :consensus, @consensus)
 
+  @spec ready? :: boolean()
+  defp ready? do
+    %{fsm: fsm} = Cloister.Monitor.state()
+    Finitomata.state(fsm).current == :ready
+  end
+
   @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
   defp wait_consensus(consensus, retries) do
-    Process.sleep(@consensus_timeout)
-    do_wait_consensus(Cloister.Modules.info_module().nodes(), consensus, retries)
+    if retries > 0, do: Process.sleep(@consensus_timeout)
+    if ready?(), do: :ok, else: do_wait_consensus(consensus, retries)
   end
 
   @spec do_wait_consensus(
-          [node()] | {:error, :no_such_ring},
           consensus :: non_neg_integer(),
           retries :: non_neg_integer()
         ) :: :ok
-  defp do_wait_consensus({:error, :no_such_ring}, consensus, retries),
-    do: wait_consensus(consensus, retries)
+  defp do_wait_consensus(consensus, retries) do
+    nodes = Cloister.Monitor.siblings()
 
-  defp do_wait_consensus(nodes, consensus, retries) when is_list(nodes) do
     nodes
     |> Enum.count()
     |> case do

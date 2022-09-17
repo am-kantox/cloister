@@ -131,24 +131,19 @@ defmodule Cloister.Monitor do
   @doc "Returns an internal state of the Node"
   def state(name \\ __MODULE__), do: GenServer.call(name, :state)
 
-  @spec siblings :: [node()]
+  @spec siblings(module()) :: [node()] | {:error, :no_such_ring}
   @doc "Returns the nodes in the cluster that are connected to this one in the same group"
-  def siblings do
-    case siblings!() do
-      {:error, :no_such_ring} -> []
-      list when is_list(list) -> list
-    end
-  end
-
-  @doc false
-  @spec siblings! :: [node()] | {:error, :no_such_ring}
-  def siblings! do
-    %Mon{ring: ring} = nodes!()
+  def siblings(name \\ __MODULE__) do
+    %{ring: ring} = state(name)
     Ring.nodes(ring)
   end
 
-  @spec nodes!(timeout :: non_neg_integer()) :: t()
+  @doc false
+  @doc deprecated: "Use `siblings/0` instead"
+  def siblings!, do: siblings()
+
   @doc "Rehashes the ring and returns the current state"
+  @doc deprecated: "Use `siblings/0` instead"
   def nodes!(timeout \\ @nodes_delay), do: GenServer.call(__MODULE__, :nodes!, timeout)
 
   ##############################################################################
@@ -160,7 +155,6 @@ defmodule Cloister.Monitor do
   @impl GenServer
   @doc false
   def handle_call(:nodes!, _from, state) do
-    # [AM] inner transition to update list?
-    {:reply, Finitomata.state(state.fsm).payload, state}
+    {:reply, state.groups, state}
   end
 end

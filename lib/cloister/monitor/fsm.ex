@@ -50,12 +50,11 @@ defmodule Cloister.Monitor.Fsm do
   end
 
   @impl Finitomata
-  def on_transition(current, :rehash, _, %Mon{ring: ring} = state) do
+  def on_transition(_current, :rehash, _, %Mon{ring: ring, consensus: consensus} = state) do
     goto =
-      case length([node() | Node.list()]) - length(Ring.nodes(ring)) do
-        0 -> current
+      case length(Ring.nodes(ring)) - consensus do
         neg when neg < 0 -> :rehashing
-        pos when pos > 0 -> :ready
+        pos when pos >= 0 -> :ready
       end
 
     {:ok, goto, state}
