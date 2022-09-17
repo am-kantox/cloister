@@ -15,11 +15,9 @@ defmodule Cloister.Application do
         inspect(Application.get_all_env(:cloister))
     )
 
-    manager = Application.get_env(:cloister, :manager, [])
-
     children = [
       Finitomata.child_spec(),
-      {Cloister.Manager, [manager]}
+      {Cloister.Manager, [state: Application.get_all_env(:cloister)]}
     ]
 
     opts = [strategy: :one_for_all, name: Cloister.Supervisor]

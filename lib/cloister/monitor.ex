@@ -93,7 +93,7 @@ defmodule Cloister.Monitor do
 
     fsm_name = "monitor_#{state[:otp_app]}"
 
-    Finitomata.start_fsm(Cloister.Monitor.Fsm, fsm_name, struct!(Mon, state))
+    Finitomata.start_fsm(Cloister.Monitor.Fsm, fsm_name, struct(Mon, state))
 
     {:ok, %{fsm: fsm_name, ring: ring, groups: []}}
   end
