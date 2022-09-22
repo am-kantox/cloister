@@ -37,10 +37,9 @@ defmodule Cloister.Monitor.Fsm do
   end
 
   @impl Finitomata
-  def on_timer(current, %State{payload: %Mon{} = mon}) when current in ~w|rehashing ready|a do
-    mon.ring
-    |> Ring.nodes()
-    |> update_state(mon)
+  def on_timer(current, %State{payload: %Mon{ring: ring} = mon}) when current in ~w|rehashing ready|a do
+    {nodes, ring} = nodes_vs_ring(ring)
+    if MapSet.equal?(nodes, ring), do: :ok, else: {:transition, :rehash, mon}
   end
 
   @impl Finitomata
@@ -51,6 +50,11 @@ defmodule Cloister.Monitor.Fsm do
 
   @impl Finitomata
   def on_transition(_current, :rehash, _, %Mon{ring: ring, consensus: consensus} = state) do
+    {na, nr} = nodes_vs_ring(ring)
+
+    na |> MapSet.difference(nr) |> Enum.each(&Ring.add_node(ring, &1))
+    nr |> MapSet.difference(na) |> Enum.each(&Ring.remove_node(ring, &1))
+
     goto =
       case length(Ring.nodes(ring)) - consensus do
         neg when neg < 0 -> :rehashing
@@ -66,24 +70,6 @@ defmodule Cloister.Monitor.Fsm do
         payload: %Mon{listener: listener} = state
       }) do
     listener.on_state_change(from, state)
-  end
-
-  @spec update_state([node()] | {:error, :no_such_ring}, state :: t()) ::
-          :ok | {:transiiton, :nonode | :rehash, t()}
-  defp update_state({:error, :no_such_ring}, %Mon{} = state),
-    do: {:transition, :nonode, state}
-
-  defp update_state(ring, %Mon{} = state) when is_list(ring) do
-    nodes = MapSet.new([node() | Node.list()])
-    ring = MapSet.new(ring)
-
-    if MapSet.equal?(nodes, ring) do
-      :ok
-    else
-      nodes |> MapSet.difference(ring) |> Enum.each(&Ring.add_node(state.ring, &1))
-      ring |> MapSet.difference(nodes) |> Enum.each(&Ring.remove_node(state.ring, &1))
-      {:transition, :rehash, state}
-    end
   end
 
   @spec assembly_quorum(boolean(), state :: t()) :: :wait | t()
@@ -256,4 +242,8 @@ defmodule Cloister.Monitor.Fsm do
         |> if(do: :longnames, else: :shortnames)
     end
   end
+
+  @spec nodes_vs_ring(atom()) :: {MapSet.t(node()), MapSet.t(node())}
+  defp nodes_vs_ring(ring),
+    do: {MapSet.new([node() | Node.list()]), MapSet.new(Ring.nodes(ring))}
 end
