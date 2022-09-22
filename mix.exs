@@ -54,7 +54,7 @@ defmodule Cloister.MixProject do
       {:nimble_options, "~> 0.2"},
       # dev / test
       {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci]},
-      {:dialyxir, "~> 1.1.0", only: [:dev, :ci], runtime: false},
+      {:dialyxir, "~> 1.1", only: [:dev, :ci], runtime: false},
       {:credo, "~> 1.0", only: [:dev, :ci], runtime: false},
       {:ex_doc, "~> 0.11", only: :dev}
     ]
