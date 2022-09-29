@@ -108,7 +108,7 @@ defmodule Cloister.MixProject do
     ]
   end
 
-  def compilers(:dev), do: [:boundary | Mix.compilers()]
+  def compilers(:dev), do: [:boundary, :finitomata | Mix.compilers()]
   def compilers(_), do: Mix.compilers()
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]

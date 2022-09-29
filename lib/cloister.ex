@@ -9,7 +9,7 @@ defmodule Cloister do
   #{NimbleOptions.docs(Cloister.Options.schema())}
   """
 
-  use Boundary, exports: [Monitor, Node]
+  use Boundary, exports: [Listener, Monitor, Node]
 
   use DynamicSupervisor
 
