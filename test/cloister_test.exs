@@ -35,6 +35,18 @@ defmodule CloisterTest do
   end
 
   test "groups" do
-    Logger.warn("Groups: " <> inspect(Cloister.state().groups))
+    assert 5 = length(Cloister.state().groups[:ring])
+    assert :"cloister_0@127.0.0.1" in Cloister.state().groups[:ring]
+    assert :"cloister_1@127.0.0.1" in Cloister.state().groups[:ring]
+    assert :"cloister_2@127.0.0.1" in Cloister.state().groups[:ring]
+    assert :"cloister_3@127.0.0.1" in Cloister.state().groups[:ring]
+    assert :"cloister_4@127.0.0.1" in Cloister.state().groups[:ring]
+
+    assert 5 = length(Cloister.state().groups[:cluster])
+    assert :"cloister_0@127.0.0.1" in Cloister.state().groups[:cluster]
+    assert :"cloister_1@127.0.0.1" in Cloister.state().groups[:cluster]
+    assert :"cloister_2@127.0.0.1" in Cloister.state().groups[:cluster]
+    assert :"cloister_3@127.0.0.1" in Cloister.state().groups[:cluster]
+    assert :"cloister_4@127.0.0.1" in Cloister.state().groups[:cluster]
   end
 end

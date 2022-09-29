@@ -117,7 +117,7 @@ defmodule Cloister.Monitor do
 
     Finitomata.transition(state.fsm, {:rehash, nil})
 
-    {:noreply, %{state | groups: [node | Node.list()]}}
+    {:noreply, state}
   end
 
   @impl GenServer
@@ -150,7 +150,17 @@ defmodule Cloister.Monitor do
 
   @impl GenServer
   @doc false
-  def handle_call(:state, _from, state), do: {:reply, state, state}
+  def handle_call(:state, _from, state) do
+    state = %{
+      state
+      | groups: [
+          ring: Ring.nodes(state.ring),
+          cluster: [node() | Node.list()]
+        ]
+    }
+
+    {:reply, state, state}
+  end
 
   @impl GenServer
   @doc false
