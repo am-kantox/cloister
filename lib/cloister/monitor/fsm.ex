@@ -37,7 +37,8 @@ defmodule Cloister.Monitor.Fsm do
   end
 
   @impl Finitomata
-  def on_timer(current, %State{payload: %Mon{ring: ring} = mon}) when current in ~w|rehashing ready|a do
+  def on_timer(current, %State{payload: %Mon{ring: ring} = mon})
+      when current in ~w|rehashing ready|a do
     {nodes, ring} = nodes_vs_ring(ring)
     if MapSet.equal?(nodes, ring), do: :ok, else: {:transition, :rehash, mon}
   end

@@ -27,6 +27,7 @@ config :cloister,
 
 ## Changelog
 
+- **`0.13.0`** [BUG] fixed `Cloister.state/0` adding groups (credits: @anthony-gonzalez-kantox)
 - **`0.12.0`** complete rewrite of cluster assembly based on `Finitomata`
 - **`0.10.0`** `Cloister.siblings!/0` and `Cloister.consensus/0`, better tests
 - **`0.9.0`** `Cloister.multiapply/4` to wrap `:rpc.multicall/4`
