@@ -2,7 +2,7 @@ defmodule Cloister.MixProject do
   use Mix.Project
 
   @app :cloister
-  @version "0.13.0"
+  @version "0.14.0"
 
   def project do
     [
@@ -108,8 +108,8 @@ defmodule Cloister.MixProject do
     ]
   end
 
-  def compilers(:dev), do: [:boundary, :finitomata | Mix.compilers()]
-  def compilers(_), do: Mix.compilers()
+  def compilers(:prod), do: Mix.compilers()
+  def compilers(_), do: [:boundary, :finitomata | Mix.compilers()]
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(:ci), do: ["lib", "test/support"]

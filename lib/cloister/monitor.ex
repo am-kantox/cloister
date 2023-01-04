@@ -93,7 +93,7 @@ defmodule Cloister.Monitor do
 
     fsm_name = "monitor_#{state[:otp_app]}"
 
-    Finitomata.start_fsm(Cloister.Monitor.Fsm, fsm_name, struct(Mon, state))
+    Finitomata.start_fsm(Cloister, Cloister.Monitor.Fsm, fsm_name, struct(Mon, state))
 
     {:ok, %{fsm: fsm_name, ring: ring, groups: []}}
   end
@@ -102,7 +102,7 @@ defmodule Cloister.Monitor do
   @doc false
   def terminate(reason, %{fsm: fsm}) do
     Logger.warn("[🕸️ :#{node()}] ⏹️  reason: [" <> inspect(reason) <> "]")
-    Finitomata.transition(fsm, {:stop!, %{reason: reason}})
+    Finitomata.transition(Cloister, fsm, {:stop!, %{reason: reason}})
   end
 
   @impl GenServer
@@ -115,7 +115,7 @@ defmodule Cloister.Monitor do
         inspect(info) <> "], state: [" <> inspect(state) <> "]"
     )
 
-    Finitomata.transition(state.fsm, {:rehash, nil})
+    Finitomata.transition(Cloister, state.fsm, {:rehash, nil})
 
     {:noreply, state}
   end

@@ -16,7 +16,7 @@ defmodule Cloister.Application do
     )
 
     children = [
-      Finitomata.child_spec(),
+      Finitomata.child_spec(Cloister),
       {Cloister.Manager, [state: Application.get_all_env(:cloister)]}
     ]
 
@@ -54,7 +54,7 @@ defmodule Cloister.Application do
   @spec ready? :: boolean()
   defp ready? do
     %{fsm: fsm} = Cloister.Monitor.state()
-    Finitomata.state(fsm).current == :ready
+    Finitomata.state(Cloister, fsm).current == :ready
   end
 
   @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
