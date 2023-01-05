@@ -11,11 +11,11 @@ jobs:
       matrix:
         include:
           - pair:
-              otp: 22.3
-              elixir: 1.12.3
+              otp: 24
+              elixir: 1.12
           - pair:
-              otp: 25.0
-              elixir: 1.14.0
+              otp: 25
+              elixir: 1.14
     steps:
       - name: Checkout
         uses: actions/checkout@v2
