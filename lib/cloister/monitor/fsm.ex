@@ -20,8 +20,6 @@ defmodule Cloister.Monitor.Fsm do
   stopping --> |stop!| stopped
   """
 
-  use Boundary, deps: [Cloister.Monitor], exports: []
-
   use Finitomata, fsm: @fsm, auto_terminate: true, timer: 5_000
 
   @typep t :: Mon.t()

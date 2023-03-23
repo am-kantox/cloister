@@ -9,8 +9,6 @@ defmodule Cloister do
   #{NimbleOptions.docs(Cloister.Options.schema())}
   """
 
-  use Boundary, exports: [Listener, Monitor, Node]
-
   use DynamicSupervisor
 
   @spec start_link(opts :: keyword()) :: Supervisor.on_start()
@@ -54,6 +52,7 @@ defmodule Cloister do
   defdelegate siblings, to: Cloister.Monitor
   defdelegate siblings!, to: Cloister.Monitor
   defdelegate multicast(name, request), to: Cloister.Node
+  defdelegate multicast(nodes, name, request), to: Cloister.Node
   defdelegate multicall(name, request), to: Cloister.Node
   defdelegate multicall(nodes, name, request), to: Cloister.Node
 end

@@ -28,14 +28,14 @@ defmodule Cloister.Void do
   end
 
   @impl GenServer
-  def handle_call({:ping, pid}, {pid, tag} = _from, :ok) do
+  def handle_call({:ping, pid}, {_pid, tag} = _from, :ok) do
     IO.inspect({node(), {:ping, pid}, tag}, label: "Received call")
     GenServer.cast(pid, {:pong, self()})
     {:reply, :ok, :ok}
   end
 
   @impl GenServer
-  def handle_call({:ping_one, pid}, {pid, tag} = _from, :ok) do
+  def handle_call({:ping_one, pid}, {_pid, tag} = _from, :ok) do
     if Cloister.mine?({:ping_one, pid}) do
       IO.inspect({node(), {:ping_one, pid}, tag}, label: "Received call")
       GenServer.cast(pid, {:pong, self()})

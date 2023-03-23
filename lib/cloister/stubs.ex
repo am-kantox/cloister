@@ -3,12 +3,8 @@ defmodule Cloister.Modules do
 
   require Logger
 
-  use Boundary, deps: [Cloister]
-
   defmodule Stubs do
     @moduledoc false
-
-    use Boundary
 
     defmodule Info do
       @moduledoc false
@@ -49,8 +45,6 @@ defmodule Cloister.Modules do
 
     defmodule Listener do
       @moduledoc false
-
-      use Boundary
 
       require Logger
 

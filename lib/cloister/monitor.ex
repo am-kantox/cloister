@@ -6,8 +6,6 @@ defmodule Cloister.Monitor do
   """
   use GenServer
 
-  use Boundary, deps: [Cloister.Modules], exports: []
-
   require Logger
 
   alias Cloister.Monitor, as: Mon

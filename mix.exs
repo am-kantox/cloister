@@ -2,7 +2,7 @@ defmodule Cloister.MixProject do
   use Mix.Project
 
   @app :cloister
-  @version "0.14.0"
+  @version "0.15.0"
 
   def project do
     [
@@ -50,8 +50,7 @@ defmodule Cloister.MixProject do
     [
       {:libring, "~> 1.0"},
       {:finitomata, "~> 0.7"},
-      {:boundary, "~> 0.4", runtime: false},
-      {:nimble_options, "~> 0.2"},
+      {:nimble_options, "~> 0.2 or ~> 1.0"},
       # dev / test
       {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci]},
       {:dialyxir, "~> 1.1", only: [:dev, :ci], runtime: false},
@@ -108,8 +107,8 @@ defmodule Cloister.MixProject do
     ]
   end
 
-  def compilers(:prod), do: Mix.compilers()
-  def compilers(_), do: [:boundary, :finitomata | Mix.compilers()]
+  def compilers(:dev), do: [:finitomata | Mix.compilers()]
+  def compilers(_), do: Mix.compilers()
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(:ci), do: ["lib", "test/support"]
