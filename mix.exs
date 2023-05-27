@@ -12,7 +12,7 @@ defmodule Cloister.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: compilers(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      preferred_cli_env: ["test.cluster": :test],
+      preferred_cli_env: ["test.cluster": :test, "cloister.test": :test],
       xref: [exclude: []],
       description: description(),
       package: package(),

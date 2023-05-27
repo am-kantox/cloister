@@ -99,7 +99,7 @@ defmodule Cloister.Monitor do
   @impl GenServer
   @doc false
   def terminate(reason, %{fsm: fsm}) do
-    Logger.warn("[🕸️ :#{node()}] ⏹️  reason: [" <> inspect(reason) <> "]")
+    Logger.warning("[🕸️ :#{node()}] ⏹️  reason: [" <> inspect(reason) <> "]")
     Finitomata.transition(Cloister, fsm, {:stop!, %{reason: reason}})
   end
 

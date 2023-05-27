@@ -78,7 +78,7 @@ defmodule Cloister.Application do
 
         case div(retries, 10) do
           0 -> Logger.info(message)
-          r when r < 10 and rem(retries, 10) == 0 -> Logger.warn(message)
+          r when r < 10 and rem(retries, 10) == 0 -> Logger.warning(message)
           r when r >= 10 and rem(retries, 100) == 0 -> Logger.error(message)
           _ -> :ok
         end

@@ -25,7 +25,7 @@ defmodule Cloister.Modules do
             error
 
           {true, {:error, {:invalid_ring, :no_nodes}}} ->
-            Logger.warn("Ring #{@ring} is not yet assembled, retrying.")
+            Logger.warning("Ring #{@ring} is not yet assembled, retrying.")
             Process.sleep(1_000)
             whois(@ring, term, true)
 

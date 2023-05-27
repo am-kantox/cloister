@@ -104,7 +104,7 @@ defmodule Cloister.Monitor.Fsm do
                 do: sentry
 
           {:error, :nxdomain} ->
-            Logger.warn("[🕸️ :#{node()}] Service not found: #{inspect(service)}.")
+            Logger.warning("[🕸️ :#{node()}] Service not found: #{inspect(service)}.")
 
             case consensus do
               1 -> [node()]
@@ -112,7 +112,7 @@ defmodule Cloister.Monitor.Fsm do
             end
 
           {:error, reason} ->
-            Logger.warn("[🕸️ #{inspect(service)}] :#{node()} ❓: #{inspect(reason)}.")
+            Logger.warning("[🕸️ #{inspect(service)}] :#{node()} ❓: #{inspect(reason)}.")
             []
         end
 
@@ -140,7 +140,7 @@ defmodule Cloister.Monitor.Fsm do
 
         case maybe_ips do
           [] ->
-            Logger.warn("[🕸️ :#{node()}] IP could not be found, retrying.")
+            Logger.warning("[🕸️ :#{node()}] IP could not be found, retrying.")
             net_kernel_magic(type, otp_app, monitor)
 
           [ip | _] ->
@@ -212,7 +212,7 @@ defmodule Cloister.Monitor.Fsm do
   @spec node_restart({:ok, binary()} | {:skip, any()}, otp_app :: atom()) ::
           {:ok, pid()} | {:error, term()}
   defp node_restart({:skip, any}, _otp_app) do
-    Logger.warn("[🕸️ :#{node()}] skipping restart, expected host, got: [#{inspect(any)}].")
+    Logger.warning("[🕸️ :#{node()}] skipping restart, expected host, got: [#{inspect(any)}].")
     {:error, any}
   end
 
