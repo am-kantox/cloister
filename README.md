@@ -27,6 +27,7 @@ config :cloister,
 
 ## Changelog
 
+- **`0.16.0`** [EXP] experimental `mix` tasks to test/run stuff in a cloister
 - **`0.15.0`** [BUG] fixed `Cloister.multicast/multicall`
 - **`0.14.0`** named isolated `Finitomata` supervision tree
 - **`0.13.0`** [BUG] fixed `Cloister.state/0` adding groups (credits: @anthony-gonzalez-kantox)
