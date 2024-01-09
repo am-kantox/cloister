@@ -2,7 +2,7 @@ defmodule Cloister.MixProject do
   use Mix.Project
 
   @app :cloister
-  @version "0.16.0"
+  @version "0.17.0"
 
   def project do
     [
@@ -12,7 +12,8 @@ defmodule Cloister.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       compilers: compilers(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      preferred_cli_env: ["test.cluster": :test, "cloister.test": :test],
+      prune_code_paths: Mix.env() == :prod,
+      preferred_cli_env: [enfiladex: :test, "enfiladex.ex_unit": :test, "cloister.test": :test],
       xref: [exclude: []],
       description: description(),
       package: package(),
@@ -28,8 +29,8 @@ defmodule Cloister.MixProject do
       ],
       dialyzer: [
         plt_file: {:no_warn, ".dialyzer/plts/dialyzer.plt"},
-        plt_add_deps: :transitive,
-        plt_add_apps: [:nimble_options],
+        plt_add_deps: :app_tree,
+        plt_add_apps: [:mix, :nimble_options],
         list_unused_filters: true,
         ignore_warnings: ".dialyzer/ignore.exs"
       ]
@@ -52,7 +53,7 @@ defmodule Cloister.MixProject do
       {:finitomata, "~> 0.7"},
       {:nimble_options, "~> 0.2 or ~> 1.0"},
       # dev / test
-      {:test_cluster_task, "~> 0.5", only: [:dev, :test, :ci]},
+      {:enfiladex, "~> 0.2", only: [:dev, :test]},
       {:dialyxir, "~> 1.1", only: [:dev, :ci], runtime: false},
       {:credo, "~> 1.0", only: [:dev, :ci], runtime: false},
       {:ex_doc, "~> 0.11", only: :dev}
@@ -66,8 +67,7 @@ defmodule Cloister.MixProject do
         "format --check-formatted",
         "credo --strict",
         "dialyzer"
-      ],
-      test: ["test.cluster"]
+      ]
     ]
   end
 
@@ -107,8 +107,7 @@ defmodule Cloister.MixProject do
     ]
   end
 
-  def compilers(:dev), do: [:finitomata | Mix.compilers()]
-  def compilers(_), do: Mix.compilers()
+  def compilers(_), do: [:finitomata | Mix.compilers()]
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(:ci), do: ["lib", "test/support"]

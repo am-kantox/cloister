@@ -27,6 +27,7 @@ config :cloister,
 
 ## Changelog
 
+- **`0.17.0`** [TST] shortnames, proper testing with `enfiladex`
 - **`0.16.0`** [EXP] experimental `mix` tasks to test/run stuff in a cloister
 - **`0.15.0`** [BUG] fixed `Cloister.multicast/multicall`
 - **`0.14.0`** named isolated `Finitomata` supervision tree

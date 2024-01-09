@@ -23,6 +23,9 @@ erl_crash.dump
 cloister-*.tar
 
 /.elixir_ls/
+/.elixir-tools/
 
 /.dialyzer/plts/*.plt*
+
+/ct_logs/
 

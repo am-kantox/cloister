@@ -127,8 +127,12 @@ defmodule Cloister.Monitor.Fsm do
   defp net_kernel_magic(:longnames, _otp_app, monitor),
     do: send(monitor, :monitor_nodes)
 
+  defp net_kernel_magic(:shortnames, _otp_app, monitor),
+    do: send(monitor, :monitor_nodes)
+
   defp net_kernel_magic(type, otp_app, monitor) do
-    maybe_host =
+    {type, _} =
+      maybe_host =
       with service when is_atom(service) <- Application.fetch_env!(:cloister, :sentry),
            {:ok, s_ips} <- :inet_tcp.getaddrs(service),
            {:ok, l_ips} <- :inet.getifaddrs() do
@@ -149,12 +153,17 @@ defmodule Cloister.Monitor.Fsm do
         end
       else
         expected when expected == {:error, :nxdomain} or is_list(expected) ->
-          magic? = Application.get_env(:cloister, :magic?, true)
+          magic? = Application.get_env(:cloister, :magic?, :longnames)
 
           case {magic?, :inet.getifaddrs()} do
-            {false, _} -> {:skip, :magic_disabled_in_config}
-            {_, {:ok, ip_addrs}} when is_list(ip_addrs) -> pick_up_addr(ip_addrs)
-            _ -> :inet.gethostname()
+            {falsey, _} when falsey in [false, :nohost] ->
+              {:skip, :magic_disabled_in_config}
+
+            {truthy, {:ok, ip_addrs}} when truthy in [true, :longnames] and is_list(ip_addrs) ->
+              pick_up_addr(ip_addrs)
+
+            _ ->
+              with {:ok, shortname} <- :inet.gethostname(), do: {:shortnames, shortname}
           end
 
         other ->
@@ -162,7 +171,7 @@ defmodule Cloister.Monitor.Fsm do
       end
 
     node_restart(maybe_host, otp_app)
-    net_kernel_magic(:longnames, otp_app, monitor)
+    net_kernel_magic(type, otp_app, monitor)
   end
 
   defp loopback?, do: Application.get_env(:cloister, :loopback?, false)
@@ -170,12 +179,12 @@ defmodule Cloister.Monitor.Fsm do
   @spec ip_addr_to_s(:inet.ip4_address()) :: binary()
   defp ip_addr_to_s({a, b, c, d}), do: "#{a}.#{b}.#{c}.#{d}"
 
-  @spec pick_up_addr([{[binary()], [any()]}]) :: {:ok, binary()} | {:skip, any()}
+  @spec pick_up_addr([{[binary()], [any()]}]) :: {:longnames, binary()} | {:skip, any()}
   defp pick_up_addr(addrs) do
     loopback = if loopback?(), do: loopback(addrs)
 
     case loopback || point_to_point(addrs) || broadcast(addrs) do
-      addr when is_binary(addr) -> {:ok, addr}
+      addr when is_binary(addr) -> {:longnames, addr}
       _other -> {:skip, {:unfit, addrs}}
     end
   end
@@ -209,21 +218,24 @@ defmodule Cloister.Monitor.Fsm do
     end
   end
 
-  @spec node_restart({:ok, binary()} | {:skip, any()}, otp_app :: atom()) ::
+  @spec node_restart(
+          {:shortnames, binary()} | {:longnames, binary()} | {:skip, any()},
+          otp_app :: atom()
+        ) ::
           {:ok, pid()} | {:error, term()}
   defp node_restart({:skip, any}, _otp_app) do
     Logger.warning("[🕸️ :#{node()}] skipping restart, expected host, got: [#{inspect(any)}].")
     {:error, any}
   end
 
-  defp node_restart({:ok, host}, otp_app) do
+  defp node_restart({type, host}, otp_app) when type in [:shortnames, :longnames] do
     stopped = Node.stop()
 
     Logger.info(
       "[🕸️ :#{node()}] stopped: [#{inspect(stopped)}], starting as: [#{otp_app}@#{host}]."
     )
 
-    Node.start(:"#{otp_app}@#{host}")
+    Node.start(:"#{otp_app}@#{host}", type)
   end
 
   @spec node_type :: Mon.node_type()

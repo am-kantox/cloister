@@ -99,8 +99,8 @@ defmodule Cloister.Options do
     ],
     magic?: [
       doc: "When false, allows to avoid node reinitialization",
-      type: :boolean,
-      default: true
+      type: {:in, [true, false, :longnames, :shortnames, :nohost]},
+      default: :longnames
     ]
   ]
 
