@@ -10,13 +10,12 @@ jobs:
     name: OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
     strategy:
       matrix:
-        otp: [25.0]
-        elixir: [1.14.0]
+        otp: [26.2]
+        elixir: [1.16]
     steps:
       - uses: actions/checkout@v2
       - uses: erlef/setup-elixir@v1
         with:
           otp-version: ${{matrix.otp}}
           elixir-version: ${{matrix.elixir}}
-      - run: MIX_ENV=ci epmd -daemon
       - run: MIX_ENV=ci mix do deps.get, quality.ci
