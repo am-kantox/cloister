@@ -194,7 +194,7 @@ defmodule Cloister.Monitor.Fsm do
   defp loopback(addrs) do
     case Enum.filter(addrs, fn {_, addr} -> :loopback in addr[:flags] end) do
       [] -> nil
-      [{_, addr}] -> ip_addr_to_s(addr[:addr])
+      [{_, addr} | _] -> ip_addr_to_s(addr[:addr])
       _many -> with {:ok, host} <- :inet.gethostname(), do: host
     end
   end
@@ -204,7 +204,7 @@ defmodule Cloister.Monitor.Fsm do
   defp point_to_point(addrs) do
     case Enum.filter(addrs, fn {_, addr} -> :pointtopoint in addr[:flags] end) do
       [] -> nil
-      [{_, addr}] -> ip_addr_to_s(addr[:addr])
+      [{_, addr} | _] -> ip_addr_to_s(addr[:addr])
       _many -> with {:ok, host} <- :inet.gethostname(), do: host
     end
   end
@@ -213,7 +213,7 @@ defmodule Cloister.Monitor.Fsm do
   @spec broadcast([{binary(), any()}]) :: binary()
   defp broadcast(addrs) do
     case Enum.filter(addrs, fn {_, addr} -> :broadcast in addr[:flags] end) do
-      [{_, addr}] -> ip_addr_to_s(addr[:addr])
+      [{_, addr} | _] -> ip_addr_to_s(addr[:addr])
       _any -> with {:ok, host} <- :inet.gethostname(), do: host
     end
   end
