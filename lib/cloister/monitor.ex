@@ -125,23 +125,21 @@ defmodule Cloister.Monitor do
     {:noreply, state}
   end
 
-  @spec state(module(), GenServer.timeout(), non_neg_integer()) :: monitor()
+  @spec state(module(), timeout(), non_neg_integer()) :: monitor()
   @doc "Returns an internal state of the Node"
   def state(name \\ __MODULE__, timeout \\ 5_000, retries \\ 5)
   def state(_name, _timeout, retries) when retries <= 0, do: nil
 
   def state(name, timeout, retries) do
-    try do
-      GenServer.call(name, :state, timeout)
-    catch
-      :badrpc, {:EXIT, {:noproc, {GenServer, :call, [^name, :state, timeout]}}} ->
-        Process.sleep(Enum.min([timeout, 1_000]))
-        state(name, timeout, retries - 1)
+    GenServer.call(name, :state, timeout)
+  catch
+    :badrpc, {:EXIT, {:noproc, {GenServer, :call, [^name, :state, timeout]}}} ->
+      Process.sleep(Enum.min([timeout, 1_000]))
+      state(name, timeout, retries - 1)
 
-      :exit, {:noproc, {GenServer, :call, [^name, :state, timeout]}} ->
-        Process.sleep(Enum.min([timeout, 1_000]))
-        state(name, timeout, retries - 1)
-    end
+    :exit, {:noproc, {GenServer, :call, [^name, :state, timeout]}} ->
+      Process.sleep(Enum.min([timeout, 1_000]))
+      state(name, timeout, retries - 1)
   end
 
   @spec siblings(module()) :: [node()] | {:error, :no_such_ring}
