@@ -149,7 +149,7 @@ defmodule Cloister.Monitor.Fsm do
 
           [ip | _] ->
             Logger.debug("[🕸️ :#{node()}] IP found: #{ip}")
-            {:ok, ip}
+            {:longnames, ip}
         end
       else
         expected when expected == {:error, :nxdomain} or is_list(expected) ->
