@@ -16,7 +16,7 @@ defmodule Cloister.Monitor.Fsm do
   ready --> |rehash| ready
   ready --> |rehash| rehashing
   ready --> |stop!| stopping
-  nonode --> |rehash| assembling
+  nonode --> |rehash!| assembling
   stopping --> |stop!| stopped
   """
 
@@ -48,7 +48,8 @@ defmodule Cloister.Monitor.Fsm do
   end
 
   @impl Finitomata
-  def on_transition(_current, :rehash, _, %Mon{ring: ring, consensus: consensus} = state) do
+  def on_transition(current, :rehash, _, %Mon{ring: ring, consensus: consensus} = state)
+      when current in ~w|rehashing ready|a do
     {na, nr} = nodes_vs_ring(ring)
 
     na |> MapSet.difference(nr) |> Enum.each(&Ring.add_node(ring, &1))
