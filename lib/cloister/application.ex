@@ -16,6 +16,7 @@ defmodule Cloister.Application do
     )
 
     children = [
+      {Cloister.Monitor.DistributedWatchdogSupervisor, Cloister.Monitor},
       Finitomata.child_spec(Cloister),
       {Cloister.Manager, [state: Application.get_all_env(:cloister)]}
     ]
@@ -44,31 +45,36 @@ defmodule Cloister.Application do
   @impl Application
   def start_phase(:rehash_on_up, _start_type, _phase_args) do
     Logger.info("[🕸️ :#{node()}] Cloister → Phase II. Updating groups.")
-    # [AM] Cloister.Monitor.update_groups(phase_args)
-    :ok
+    :ok = Cloister.Monitor.DistributedWatchdog.update_sentry()
   end
 
   @spec consensus :: non_neg_integer()
   def consensus, do: Application.get_env(:cloister, :consensus, @consensus)
 
-  @spec ready? :: boolean()
-  defp ready? do
-    %{fsm: fsm} = Cloister.Monitor.state()
-    Finitomata.state(Cloister, fsm).current == :ready
-  end
+  @spec ready?(monitor :: module()) :: boolean()
+  defp ready?(monitor), do: match?(%{current: :ready}, Cloister.fsm_state(monitor))
 
-  @spec wait_consensus(consensus :: non_neg_integer(), retries :: non_neg_integer()) :: :ok
-  defp wait_consensus(consensus, retries) do
-    if retries > 0, do: Process.sleep(@consensus_timeout)
-    if ready?(), do: :ok, else: do_wait_consensus(consensus, retries)
-  end
-
-  @spec do_wait_consensus(
+  @spec wait_consensus(
+          monitor :: module(),
           consensus :: non_neg_integer(),
           retries :: non_neg_integer()
         ) :: :ok
-  defp do_wait_consensus(consensus, retries) do
-    nodes = Cloister.Monitor.siblings()
+  defp wait_consensus(monitor \\ Cloister.Monitor, consensus, retries) do
+    if retries > 0, do: Process.sleep(@consensus_timeout)
+    if ready?(monitor), do: :ok, else: do_wait_consensus(monitor, consensus, retries)
+  catch
+    :exit, :timeout ->
+      Logger.warning("Timeout while waiting for consensus, retrying…")
+      wait_consensus(monitor, consensus, retries)
+  end
+
+  @spec do_wait_consensus(
+          monitor :: module(),
+          consensus :: non_neg_integer(),
+          retries :: non_neg_integer()
+        ) :: :ok
+  defp do_wait_consensus(monitor, consensus, retries) do
+    nodes = Cloister.Monitor.siblings(monitor)
 
     nodes
     |> Enum.count()
@@ -83,7 +89,7 @@ defmodule Cloister.Application do
           _ -> :ok
         end
 
-        wait_consensus(consensus, retries + 1)
+        wait_consensus(monitor, consensus, retries + 1)
 
       _ ->
         Logger.info("[🕸️ :#{node()}] ⌚ retries: [#{retries}], nodes: [" <> inspect(nodes) <> "]")

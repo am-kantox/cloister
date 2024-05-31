@@ -2,17 +2,23 @@ defmodule Cloister.Monitor.Fsm do
   @moduledoc false
 
   alias Cloister.Monitor, as: Mon
+  alias Cloister.Monitor.DistributedWatchdog, as: DW
+  alias Cloister.Monitor.DistributedWatchdogSupervisor, as: DWS
   alias Finitomata.State, as: State
   alias HashRing.Managed, as: Ring
 
   @fsm """
   down --> |quorum!| assembling
+  assembling --> |rehash| assembling
+  assembling --> |sentry| assembling
   assembling --> |assembled| rehashing
   rehashing --> |nonode| nonode
   rehashing --> |rehash| rehashing
+  rehashing --> |sentry| rehashing
   rehashing --> |rehash| ready
   rehashing --> |stop!| stopping
   ready --> |nonode| nonode
+  ready --> |sentry| ready
   ready --> |rehash| ready
   ready --> |rehash| rehashing
   ready --> |stop!| stopping
@@ -34,7 +40,6 @@ defmodule Cloister.Monitor.Fsm do
     end
   end
 
-  @impl Finitomata
   def on_timer(current, %State{payload: %Mon{ring: ring} = mon})
       when current in ~w|rehashing ready|a do
     {nodes, ring} = nodes_vs_ring(ring)
@@ -47,7 +52,6 @@ defmodule Cloister.Monitor.Fsm do
     {:ok, :down, state}
   end
 
-  @impl Finitomata
   def on_transition(current, :rehash, _, %Mon{ring: ring, consensus: consensus} = state)
       when current in ~w|rehashing ready|a do
     {na, nr} = nodes_vs_ring(ring)
@@ -64,11 +68,24 @@ defmodule Cloister.Monitor.Fsm do
     {:ok, goto, state}
   end
 
+  def on_transition(current, :sentry, set?, %Mon{} = state)
+      when current in ~w|assembling rehashing ready|a do
+    {:ok, current, %Mon{state | sentry?: set?}}
+  end
+
   @impl Finitomata
-  def on_enter(_entering, %Finitomata.State{
+  def on_enter(entering, %Finitomata.State{
         history: [from | _],
         payload: %Mon{listener: listener} = state
       }) do
+    downgrade =
+      (match?({:ready, _}, from) or :ready == from) and :rehashing == entering
+
+    if :ready == entering or downgrade do
+      if is_nil(GenServer.whereis(DW.name(state.monitor))), do: Supervisor.restart_child(DWS, DW)
+      DW.update_sentry(state.monitor)
+    end
+
     listener.on_state_change(from, state)
   end
 

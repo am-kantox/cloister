@@ -25,6 +25,7 @@ defmodule Cloister.Monitor do
   @type t :: %{
           __struct__: Cloister.Monitor,
           otp_app: atom(),
+          node: node(),
           consensus: pos_integer(),
           listener: module(),
           monitor: module(),
@@ -36,6 +37,7 @@ defmodule Cloister.Monitor do
         }
 
   defstruct otp_app: :cloister,
+            node: nil,
             consensus: 1,
             listener: nil,
             monitor: nil,
@@ -47,6 +49,8 @@ defmodule Cloister.Monitor do
 
   # millis
   @nodes_delay 1_000
+
+  @otp_app Application.compile_env(:cloister, :otp_app, :cloister)
 
   @doc """
   Used to start `Cloister.Monitor`.
@@ -69,7 +73,7 @@ defmodule Cloister.Monitor do
   @impl GenServer
   @doc false
   def init(state) do
-    otp_app = Keyword.get_lazy(state, :otp_app, fn -> Keyword.get(state, :otp_app, :cloister) end)
+    {otp_app, state} = Keyword.pop(state, :otp_app, @otp_app)
 
     ring =
       case Ring.nodes(state[:ring]) do
@@ -83,15 +87,17 @@ defmodule Cloister.Monitor do
 
     state =
       state
-      |> Keyword.put_new(:otp_app, otp_app)
+      |> Keyword.put(:otp_app, otp_app)
+      |> Keyword.put(:node, node())
       |> Keyword.put_new(:ring, ring)
       |> Keyword.put_new(:listener, Cloister.Modules.listener_module())
       |> Keyword.put_new(:started_at, DateTime.utc_now())
       |> Keyword.put_new(:consensus, Application.get_env(:cloister, :consensus))
 
-    fsm_name = "monitor_#{state[:otp_app]}"
+    monitor_state = struct(Mon, state)
 
-    Finitomata.start_fsm(Cloister, Cloister.Monitor.Fsm, fsm_name, struct(Mon, state))
+    fsm_name = fsm_name(monitor_state)
+    Finitomata.start_fsm(Cloister, fsm_name, Cloister.Monitor.Fsm, monitor_state)
 
     {:ok, %{fsm: fsm_name, ring: ring, groups: []}}
   end
@@ -113,7 +119,7 @@ defmodule Cloister.Monitor do
         inspect(info) <> "], state: [" <> inspect(state) <> "]"
     )
 
-    Finitomata.transition(Cloister, state.fsm, {:rehash, nil})
+    Finitomata.transition(Cloister, state.fsm, :rehash)
 
     {:noreply, state}
   end
@@ -125,9 +131,13 @@ defmodule Cloister.Monitor do
     {:noreply, state}
   end
 
+  @doc false
+  def fsm_name(%Mon{otp_app: otp_app}), do: "monitor_#{otp_app}"
+  def fsm_name(otp_app), do: "monitor_#{otp_app}"
+
   @spec state(module(), timeout(), non_neg_integer()) :: monitor()
   @doc "Returns an internal state of the Node"
-  def state(name \\ __MODULE__, timeout \\ 5_000, retries \\ 5)
+  def state(name \\ __MODULE__, timeout \\ 60_000, retries \\ 5)
   def state(_name, _timeout, retries) when retries <= 0, do: nil
 
   def state(name, timeout, retries) do
@@ -150,8 +160,8 @@ defmodule Cloister.Monitor do
   end
 
   @doc false
-  @doc deprecated: "Use `siblings/0` instead"
-  def siblings!, do: siblings()
+  @doc deprecated: "Use `siblings/1` instead"
+  def siblings!(name \\ __MODULE__), do: siblings(name)
 
   @doc "Rehashes the ring and returns the current state"
   @doc deprecated: "Use `siblings/0` instead"
