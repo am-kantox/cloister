@@ -73,21 +73,19 @@ defmodule Cloister.Monitor do
   @impl GenServer
   @doc false
   def init(state) do
-    {otp_app, state} = Keyword.pop(state, :otp_app, @otp_app)
-
     ring =
       case Ring.nodes(state[:ring]) do
         nodes when is_list(nodes) ->
           state[:ring]
 
         {:error, :no_such_ring} ->
-          {:ok, _ring} = Ring.new(otp_app)
-          otp_app
+          {:ok, _ring} = Ring.new(@otp_app)
+          @otp_app
       end
 
     state =
       state
-      |> Keyword.put(:otp_app, otp_app)
+      |> Keyword.put(:otp_app, @otp_app)
       |> Keyword.put(:node, node())
       |> Keyword.put_new(:ring, ring)
       |> Keyword.put_new(:listener, Cloister.Modules.listener_module())

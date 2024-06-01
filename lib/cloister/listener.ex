@@ -11,6 +11,7 @@ defmodule Cloister.Listener do
   """
   @callback on_state_change(
               from :: Cloister.Monitor.Fsm.state(),
+              to :: Cloister.Monitor.Fsm.state(),
               state :: Cloister.Monitor.t()
             ) :: :ok
 end

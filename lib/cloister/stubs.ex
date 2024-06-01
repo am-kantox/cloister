@@ -53,13 +53,15 @@ defmodule Cloister.Modules do
       @ring Application.compile_env(:cloister, :otp_app, :cloister)
 
       @impl Cloister.Listener
-      def on_state_change(from, state) do
-        Logger.debug(
+      def on_state_change(from, to, state) do
+        Logger.info(
           "[🕸️ " <>
             inspect(@ring) <>
-            ":#{node()}] 🔄 from: " <>
+            ":#{node()}] ♻  from: ‹" <>
             inspect(from) <>
-            ", state: " <>
+            "› to: ‹" <>
+            inspect(to) <>
+            "›, state: " <>
             inspect(state)
         )
       end

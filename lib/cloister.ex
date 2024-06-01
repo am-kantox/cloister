@@ -89,6 +89,14 @@ defmodule Cloister do
          do: state
   end
 
+  @doc """
+  Retrieves states of all the nodes in the cloister.
+  """
+  @spec states(monitor :: module()) :: {[Cloister.Monitor.t()], [node()]}
+  def states(monitor \\ Cloister.Monitor) do
+    Cloister.multiapply(Cloister, :state, [monitor])
+  end
+
   @doc false
   @spec fsm_state(monitor :: module()) :: nil | Finitomata.State.t()
   def fsm_state(monitor \\ Cloister.Monitor) do
@@ -97,13 +105,19 @@ defmodule Cloister do
   end
 
   @doc """
-  Returns a sentry of this cloister.
+  Returns `{:ok, node()}` if the cloister has the only one sentry, or `{:error, [node()]`
+    with the list of nodes fancied themselves a sentry. 
   """
-  @spec sentry(monitor :: module()) :: [node()]
+
+  @spec sentry(monitor :: module()) :: {:ok, node()} | {:error, [node()]}
   def sentry(monitor \\ Cloister.Monitor) do
-    Cloister
-    |> Cloister.multiapply(:state, [monitor])
+    monitor
+    |> states()
     |> elem(0)
-    |> Enum.filter(&match?(%Cloister.Monitor{sentry?: true}, &1))
+    |> Enum.split_with(&match?(%Cloister.Monitor{sentry?: true}, &1))
+    |> case do
+      {[sentry], _ordinary} -> {:ok, sentry}
+      {unexpected, _ordinary} -> {:error, unexpected}
+    end
   end
 end

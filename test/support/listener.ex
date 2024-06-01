@@ -4,7 +4,11 @@ defmodule Cloister.Listener.Default do
   @behaviour Cloister.Listener
   require Logger
 
-  def on_state_change(from, state) do
-    Logger.debug("[🕸️ @:#{node()}] 🔄 from: " <> inspect(from) <> ", state: " <> inspect(state))
+  @impl Cloister.Listener
+  def on_state_change(from, to, state) do
+    Logger.debug(
+      "[🕸️ @:#{node()}] ♻  from: " <>
+        inspect(from) <> ", to: " <> inspect(to) <> ", state: " <> inspect(state)
+    )
   end
 end

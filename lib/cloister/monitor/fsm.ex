@@ -14,14 +14,15 @@ defmodule Cloister.Monitor.Fsm do
   assembling --> |assembled| rehashing
   rehashing --> |nonode| nonode
   rehashing --> |rehash| rehashing
-  rehashing --> |sentry| rehashing
+  rehashing --> |sentry| election
   rehashing --> |rehash| ready
   rehashing --> |stop!| stopping
   ready --> |nonode| nonode
-  ready --> |sentry| ready
+  ready --> |sentry| election
   ready --> |rehash| ready
   ready --> |rehash| rehashing
   ready --> |stop!| stopping
+  election --> |elected!| ready
   nonode --> |rehash!| assembling
   stopping --> |stop!| stopped
   """
@@ -69,8 +70,12 @@ defmodule Cloister.Monitor.Fsm do
   end
 
   def on_transition(current, :sentry, set?, %Mon{} = state)
-      when current in ~w|assembling rehashing ready|a do
-    {:ok, current, %Mon{state | sentry?: set?}}
+      when current in ~w|rehashing ready|a do
+    {:ok, :election, %Mon{state | sentry?: set?}}
+  end
+
+  def on_transition(:assembling, :sentry, _set?, %Mon{} = state) do
+    {:ok, :assembling, %Mon{state | sentry?: false}}
   end
 
   @impl Finitomata
@@ -82,11 +87,13 @@ defmodule Cloister.Monitor.Fsm do
       (match?({:ready, _}, from) or :ready == from) and :rehashing == entering
 
     if :ready == entering or downgrade do
-      if is_nil(GenServer.whereis(DW.name(state.monitor))), do: Supervisor.restart_child(DWS, DW)
+      if is_nil(GenServer.whereis(DW.name(state.monitor))),
+        do: Supervisor.restart_child(DWS, DW)
+
       DW.update_sentry(state.monitor)
     end
 
-    listener.on_state_change(from, state)
+    listener.on_state_change(from, entering, state)
   end
 
   @spec assembly_quorum(boolean(), state :: t()) :: :wait | t()
