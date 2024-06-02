@@ -27,6 +27,7 @@ config :cloister,
 
 ## Changelog
 
+- **`0.18.0`** [BREAK] `sentry` is always properly set up, `Listener.on_state_change/3`
 - **`0.17.0`** [TST] shortnames, proper testing with `enfiladex`
 - **`0.16.0`** [EXP] experimental `mix` tasks to test/run stuff in a cloister
 - **`0.15.0`** [BUG] fixed `Cloister.multicast/multicall`
