@@ -116,8 +116,8 @@ defmodule Cloister do
     |> elem(0)
     |> Enum.split_with(&match?(%Cloister.Monitor{sentry?: true}, &1))
     |> case do
-      {[sentry], _ordinary} -> {:ok, sentry}
-      {unexpected, _ordinary} -> {:error, unexpected}
+      {[sentry], _failed} -> {:ok, sentry}
+      {unexpected, _failed} -> {:error, unexpected}
     end
   end
 end
