@@ -93,7 +93,17 @@ defmodule Cloister.Monitor.Fsm do
       DW.update_sentry(state.monitor)
     end
 
-    listener.on_state_change(from, entering, state)
+    cond do
+      is_nil(listener) ->
+        :ok
+
+      # [AM] remove in 1.0
+      function_exported?(listener, :on_state_change, 2) ->
+        listener.on_state_change(from, state)
+
+      true ->
+        listener.on_state_change(from, entering, state)
+    end
   end
 
   @spec assembly_quorum(boolean(), state :: t()) :: :wait | t()
