@@ -2,20 +2,27 @@ defmodule Cloister.Monitor.Fsm do
   @moduledoc false
 
   alias Cloister.Monitor, as: Mon
+  alias Cloister.Monitor.DistributedWatchdog, as: DW
+  alias Cloister.Monitor.DistributedWatchdogSupervisor, as: DWS
   alias Finitomata.State, as: State
   alias HashRing.Managed, as: Ring
 
   @fsm """
   down --> |quorum!| assembling
+  assembling --> |rehash| assembling
+  assembling --> |sentry| assembling
   assembling --> |assembled| rehashing
   rehashing --> |nonode| nonode
   rehashing --> |rehash| rehashing
+  rehashing --> |sentry| election
   rehashing --> |rehash| ready
   rehashing --> |stop!| stopping
   ready --> |nonode| nonode
+  ready --> |sentry| election
   ready --> |rehash| ready
   ready --> |rehash| rehashing
   ready --> |stop!| stopping
+  election --> |elected!| ready
   nonode --> |rehash!| assembling
   stopping --> |stop!| stopped
   """
@@ -34,7 +41,6 @@ defmodule Cloister.Monitor.Fsm do
     end
   end
 
-  @impl Finitomata
   def on_timer(current, %State{payload: %Mon{ring: ring} = mon})
       when current in ~w|rehashing ready|a do
     {nodes, ring} = nodes_vs_ring(ring)
@@ -47,7 +53,6 @@ defmodule Cloister.Monitor.Fsm do
     {:ok, :down, state}
   end
 
-  @impl Finitomata
   def on_transition(current, :rehash, _, %Mon{ring: ring, consensus: consensus} = state)
       when current in ~w|rehashing ready|a do
     {na, nr} = nodes_vs_ring(ring)
@@ -64,12 +69,41 @@ defmodule Cloister.Monitor.Fsm do
     {:ok, goto, state}
   end
 
+  def on_transition(current, :sentry, set?, %Mon{} = state)
+      when current in ~w|rehashing ready|a do
+    {:ok, :election, %Mon{state | sentry?: set?}}
+  end
+
+  def on_transition(:assembling, :sentry, _set?, %Mon{} = state) do
+    {:ok, :assembling, %Mon{state | sentry?: false}}
+  end
+
   @impl Finitomata
-  def on_enter(_entering, %Finitomata.State{
+  def on_enter(entering, %Finitomata.State{
         history: [from | _],
         payload: %Mon{listener: listener} = state
       }) do
-    listener.on_state_change(from, state)
+    downgrade =
+      (match?({:ready, _}, from) or :ready == from) and :rehashing == entering
+
+    if :ready == entering or downgrade do
+      if is_nil(GenServer.whereis(DW.name(state.monitor))),
+        do: Supervisor.restart_child(DWS, DW)
+
+      DW.update_sentry(state.monitor)
+    end
+
+    cond do
+      is_nil(listener) ->
+        :ok
+
+      # [AM] remove in 1.0
+      function_exported?(listener, :on_state_change, 2) ->
+        listener.on_state_change(from, state)
+
+      true ->
+        listener.on_state_change(from, entering, state)
+    end
   end
 
   @spec assembly_quorum(boolean(), state :: t()) :: :wait | t()

@@ -12,6 +12,21 @@ defmodule CloisterTest do
     Application.put_env(:cloister, :consensus, 3)
   end
 
+  test "sentry" do
+    assert %Cloister.Monitor{
+             otp_app: :cloister,
+             consensus: 1,
+             listener: Cloister.Modules.Stubs.Listener,
+             monitor: Cloister.Monitor,
+             alive?: true,
+             clustered?: true,
+             sentry?: true,
+             ring: :cloister
+           } = Cloister.state()
+
+    assert Cloister.sentry()
+  end
+
   test "multicasts" do
     Enfiladex.multi_peer({Cloister, :multicast, [Cloister.Void, {:ping, self()}]},
       transfer_config: :cloister,
@@ -63,16 +78,16 @@ defmodule CloisterTest do
 
     assert [ok: _, ok: _, ok: _, ok: _, ok: _] = peers
 
-    assert 6 = length(Cloister.state().groups[:ring])
+    assert 6 = length(Cloister.Monitor.state().groups[:ring])
 
     for {_pid, node} <- nodes do
-      assert node in Cloister.state().groups[:ring]
+      assert node in Cloister.Monitor.state().groups[:ring]
     end
 
-    assert 6 = length(Cloister.state().groups[:cluster])
+    assert 6 = length(Cloister.Monitor.state().groups[:cluster])
 
     for {_pid, node} <- nodes do
-      assert node in Cloister.state().groups[:cluster]
+      assert node in Cloister.Monitor.state().groups[:cluster]
     end
 
     Enfiladex.stop_peers(peers)
