@@ -99,12 +99,16 @@ defmodule Cloister.Monitor.Fsm do
 
       # [AM] remove in 1.0
       function_exported?(listener, :on_state_change, 2) ->
-        listener.on_state_change(from, state)
+        listener.on_state_change(normalize_state(from), state)
 
       true ->
-        listener.on_state_change(from, entering, state)
+        listener.on_state_change(normalize_state(from), normalize_state(entering), state)
     end
   end
+
+  @spec normalize_state({atom(), pos_integer()} | atom()) :: atom()
+  defp normalize_state({state, _num}) when is_atom(state), do: state
+  defp normalize_state(state) when is_atom(state), do: state
 
   @spec assembly_quorum(boolean(), state :: t()) :: :wait | t()
   @doc false
